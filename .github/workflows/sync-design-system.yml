@@ -1,0 +1,61 @@
+# Phase 4.13 — receive DS publish event + auto npm update + commit
+# Per user 2026-05-25「任何 ds repo 增刪改,package 該同步的都應該自動自主同步,不需要耳提面命」
+#
+# 3 trigger:
+#   1. repository_dispatch event from design-system release.yml(即時)
+#   2. schedule daily(Dependabot fallback,daily)
+#   3. workflow_dispatch(manual emergency)
+name: Sync Design System
+
+on:
+  repository_dispatch:
+    types: [design-system-published]
+  schedule:
+    - cron: '17 0 * * *'  # daily 00:17 UTC fallback
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Show payload(dispatch only)
+        if: github.event_name == 'repository_dispatch'
+        run: |
+          echo "DS published version: ${{ github.event.client_payload.version }}"
+          echo "DS tag: ${{ github.event.client_payload.tag }}"
+          echo "DS commit: ${{ github.event.client_payload.commit }}"
+
+      - name: Update @qijenchen/* to latest @beta
+        run: |
+          npm install --legacy-peer-deps
+          npm update @qijenchen/design-system @qijenchen/storybook-config --legacy-peer-deps
+          # ensure beta tag(npm update 可能拉 latest dist-tag,但兩者本是同版)
+          echo "---"
+          npm ls @qijenchen/design-system @qijenchen/storybook-config 2>&1 | head -5
+
+      - name: Verify build still pass
+        run: |
+          cd apps/_template
+          npm run build
+
+      - name: Commit + push if changed
+        run: |
+          if git diff --quiet; then
+            echo "✓ no changes(already latest)"
+            exit 0
+          fi
+          git config user.name 'ds-sync-bot'
+          git config user.email 'noreply@qijenchen.dev'
+          git add -A
+          git commit -m "chore(sync): auto-bump @qijenchen/* to latest @beta(from DS release dispatch)"
+          git push
+          echo "✓ pushed auto-sync commit"
