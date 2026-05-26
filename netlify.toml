@@ -20,21 +20,19 @@
 # Per-branch deploy previews 預設啟用(任何 branch push → 自動 preview URL)
 # Production deploy 走 main(production URL = 永遠最新 main 的 storybook)
 
-# ─── Access control(2026-05-26 per user 「不是所有人都看得到」directive)────────
-# Netlify deploy 預設 site URL 公開可訪問。Storybook 含內部產品 UI / DS 元件 demo,
-# 必須限團隊內部存取。**至少 2 道防線**:
+# ─── Access control(2026-05-26 per user directives)──────────────────────────
+# Netlify deploy 預設公開,Storybook 含內部產品 UI 必限團隊內部 access。**2 道防線**:
 #
-# 1️⃣ Defense-in-depth(本檔做):反 SEO indexing
-#    Headers 加 X-Robots-Tag noindex(Google/Bing 不收錄)+ Referrer-Policy strict-origin
-#    搜尋引擎不主動 leak URL,但仍能直接訪問 URL,所以還需第 2 道。
+# 1️⃣ Defense-in-depth(本檔 headers):反 SEO indexing
+#    X-Robots-Tag noindex(Google/Bing 不收錄)+ Referrer / X-Frame headers
+#    只防 SEO 不防直接訪問,必須配第 2 道。
 #
-# 2️⃣ Real auth gate(user 必須在 Netlify Dashboard 設):
-#    Site settings → Access & security → Visitor access →「Password protect site」
-#    需 Netlify Pro plan($19/month per member,team plan included)
-#    OR Netlify Identity widget(免費 plan 限 5 users)
-#    OR Cloudflare Access proxy(免費 plan auth gating)
+# 2️⃣ Real auth(user Netlify Dashboard 設,Default = Netlify Identity):
+#    Site settings → Identity → Enable + Invite-only + Restrict access + Invite users
+#    `.storybook/manager-head.html` widget 已 codify(fork user 不用動 code)
+#    Fallback:Pro Password($19/mo,共用密碼,visitor 不需帳號)
 #
-# 完整 step-by-step 詳 README「Access control」段。
+# 完整 step-by-step 詳 README「Storybook deploy」段。
 
 [[headers]]
   for = "/*"

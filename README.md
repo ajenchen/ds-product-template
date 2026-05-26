@@ -85,25 +85,27 @@ challenge「為何要設這個 secret?」→ 對齊 DS repo pattern(netlify.toml
 2. Netlify 自動讀根目錄 `netlify.toml` → build `storybook-static` → deploy
 3. 每次 push main → Netlify auto rebuild。Per-branch preview 自動啟用。
 
-**Step 2 — 🔒 設 access control**(per 2026-05-26 user directive「不是所有人都看得到」):
+**Step 2 — 🔒 設 access control**(per 2026-05-26 user directives):
 
-3 條路 decision tree:
+**Default = Netlify Identity ⭐**(安全 + 免費 + Netlify-native + 不複雜化 infra):
 
-| 預算 | 團隊大小 | 推薦方案 | 設定 |
-|---|---|---|---|
-| 願付 $19/mo | 任何 | **Netlify Pro password** ⭐ 1-click | Site settings → Access & security → Visitor access → Password protect site |
-| $0 / 團隊 ≤ 5 | 小團 | **Netlify Identity** widget(本 repo 已 codify)| Site settings → Identity → Enable + Invite-only + Restrict access + Invite users(無需動 code) |
-| $0 / 團隊 > 5 | 大團 | **Cloudflare Access** proxy | Cloudflare DNS proxy + Zero Trust → Access policies |
+1. Netlify Site settings → **Identity** → **Enable Identity**
+2. Registration preferences → **Invite only**(限團隊 admin invite,訪客不能自己 signup)
+3. Site settings → Visitor access → **Restrict access to site visitors**(只允 logged-in Identity users 可訪問)
+4. Identity tab → **Invite users** → 輸入團隊 email → 對方收 email → set password → 訪問
+5. **`.storybook/manager-head.html` 已 codify widget** — 自動 prompt login(fork user 不需動 code)
+
+**為何 Identity > Pro Password**:per-user account(可 individually revoke)/ audit log(知道誰登入)/ 免費 1000 users / 真正 per-person control(不是共用 password)。
+
+**Caveat**:Netlify Identity 在 2024 起 mark deprecated for new sites(短期繼續可用,長期 Netlify 可能推 successor)。若 long-term future-proof 重要,可考慮 Pro Password fallback。
+
+**Fallback option(若 Identity 不適合)— Netlify Pro Password**:
+- Site settings → Access & security → Visitor access → **Password protect site**($19/mo)
+- 整 site 一個共用 password,share 給 team — visitor 不需帳號,輸 password 即訪問
+- 缺點:共用 password,無 per-user revoke / 無 audit log
 
 **Defense-in-depth**(`netlify.toml` 已 ship):X-Robots-Tag noindex / Referrer strict-origin / X-Frame SAMEORIGIN —
-搜尋引擎不收錄 URL,但**這只防 SEO,不防直接訪問**,必須配上述 access control 才真正限團隊存取。
-
-**Netlify Identity 詳細 step**(免費 path):
-1. Netlify Site settings → **Identity** → **Enable Identity**
-2. Registration preferences → **Invite only**(限團隊內部)
-3. Site settings → Visitor access → **Restrict access to site visitors**(只允 logged-in Identity users)
-4. Identity tab → **Invite users** → 輸入團隊 email
-5. `.storybook/manager-head.html` 已 codify widget — 自動 prompt login(fork user 不需動 code)
+搜尋引擎不收錄 URL,但**只防 SEO,不防直接訪問**,必須配上述 Identity 或 Password 才真實限團隊存取。
 
 ### App deploy(`apps/_template/dist`)— 需 GitHub Actions secret
 App 是 monorepo sub-dir build(root install + cd apps/X build),Netlify Git integration 不適合
