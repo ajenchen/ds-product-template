@@ -1,0 +1,13 @@
+/* 2026-05-26 Storybook root CSS — drives Tailwind v4 scan + imports DS tokens
+ *
+ * Per user 「為何都沒吃到正確元件和設計原則」screenshot challenge:
+ *   - Tailwind v4 需 `@import 'tailwindcss'` 觸發 utility class 生成
+ *   - DS tokens 必 import(component class 才能 resolve var(--token))
+ *   - @source 指向 DS source(讓 Tailwind scan 到 DS 元件用的 utility classes 並 generate CSS)
+ *
+ * 跟 apps/_template/src/globals.css 同 pattern,但 path 從 .storybook/ 算起。
+ */
+@import 'tailwindcss';
+@import '@qijenchen/design-system/styles/tokens';
+@source '../node_modules/@qijenchen/design-system/src/**/*.{js,ts,jsx,tsx}';
+@source '../apps/**/*.{tsx,ts}';
