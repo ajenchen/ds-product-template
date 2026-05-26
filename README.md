@@ -85,15 +85,29 @@ challenge「為何要設這個 secret?」→ 對齊 DS repo pattern(netlify.toml
 2. Netlify 自動讀根目錄 `netlify.toml` → build `storybook-static` → deploy
 3. 每次 push main → Netlify auto rebuild。Per-branch preview 自動啟用。
 
-**Step 2 — 🔒 設 access control**(per 2026-05-26 user directives):
+**Step 2 — 🔒 設 access control**(Default = Netlify Identity ⭐):
 
-**Default = Netlify Identity ⭐**(安全 + 免費 + Netlify-native + 不複雜化 infra):
+**Painless path — 1 個 command 跑完**:
 
+```bash
+npm run setup:netlify
+```
+
+`scripts/setup-netlify-access.mjs` 自動化(用 Netlify CLI API):
+- 裝 Netlify CLI(若無)
+- `netlify login` 瀏覽器 OAuth
+- `netlify init` link 本 repo 到 Netlify site
+- Enable Identity + restrict visitor access(via `netlify api`)
+- Prompt 你 input team emails → invite users(via `netlify api`)
+- 5 分鐘設好
+
+**手動 fallback**(若 script 失敗):
 1. Netlify Site settings → **Identity** → **Enable Identity**
 2. Registration preferences → **Invite only**(限團隊 admin invite,訪客不能自己 signup)
 3. Site settings → Visitor access → **Restrict access to site visitors**(只允 logged-in Identity users 可訪問)
 4. Identity tab → **Invite users** → 輸入團隊 email → 對方收 email → set password → 訪問
-5. **`.storybook/manager-head.html` 已 codify widget** — 自動 prompt login(fork user 不需動 code)
+
+**`.storybook/manager-head.html` 已 codify widget**(fork user 不需動 code,Identity enable 後 widget 自動 prompt login)。
 
 **為何 Identity > Pro Password**:per-user account(可 individually revoke)/ audit log(知道誰登入)/ 免費 1000 users / 真正 per-person control(不是共用 password)。
 
