@@ -1,0 +1,45 @@
+<!-- 2026-05-26 per user 「不是所有人都看得到」directive — Netlify Identity widget pre-codified
+     供 free-tier fork-and-go path:user 只需 Netlify Dashboard enable Identity 即生效,無需 code 改動。
+
+     設定 step(fork 後):
+       1. Netlify Site settings → Identity → Enable Identity
+       2. Registration preferences → Invite only(限團隊成員 invite)
+       3. Site settings → Visitor access → Choose「Restrict access to site visitors」
+          → 只允許 logged-in Identity users
+       4. Identity tab → Invite users → 輸入團隊 email
+
+     若 user 選 Netlify Pro password / Cloudflare Access 方案,本 widget 不啟動(無影響)。
+
+     對齊 docs:https://docs.netlify.com/security/secure-access-to-sites/identity/ -->
+
+<script src="https://identity.netlify.com/v1/netlify-identity-widget.js" defer></script>
+<script>
+  (function () {
+    // 等 widget load 完再 wire,defer 確保 DOMContentLoaded 後跑
+    if (typeof window === 'undefined') return
+    document.addEventListener('DOMContentLoaded', function () {
+      if (!window.netlifyIdentity) return
+
+      // 未登入 → 自動開 login modal
+      window.netlifyIdentity.on('init', function (user) {
+        if (!user) {
+          // 隱藏 Storybook UI 直到登入
+          document.body.style.visibility = 'hidden'
+          window.netlifyIdentity.open()
+        }
+      })
+
+      // 登入成功 → reveal UI
+      window.netlifyIdentity.on('login', function () {
+        document.body.style.visibility = 'visible'
+        window.netlifyIdentity.close()
+      })
+
+      // 登出 → 重新 hide + open login
+      window.netlifyIdentity.on('logout', function () {
+        document.body.style.visibility = 'hidden'
+        window.netlifyIdentity.open()
+      })
+    })
+  })()
+</script>
