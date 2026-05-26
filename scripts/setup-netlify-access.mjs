@@ -35,6 +35,11 @@ function shOut(cmd) {
 
 console.log('🔒 Netlify access control setup(per user fork-and-go directive)')
 console.log('')
+console.log('━━━ 沒 Netlify 帳號?━━━')
+console.log('Netlify = 免費 deploy platform(類似 Vercel)。我們用它跑 Storybook + 內部 team-only access。')
+console.log('沒帳號?Step 2「netlify login」會自動開瀏覽器到 app.netlify.com,點「Sign up with GitHub」即可。')
+console.log('Netlify Free tier:免費 1000 user invite / 100GB bandwidth / 無 maintenance。')
+console.log('')
 
 // Step 1: Netlify CLI
 if (!shOut('which netlify')) {
