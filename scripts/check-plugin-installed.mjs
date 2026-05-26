@@ -47,7 +47,7 @@ ${YELLOW}本 monorepo 消費 @qijenchen/design-system,但 Claude Code DS governa
 
 ${BOLD}沒裝後果(anchor case 2026-05-26):${RESET}
   - AI 寫 App.tsx 憑記憶寫 simplified mock(漏 SidebarTrigger / collapsible / startIcon)
-  - 41 個 governance hooks 全部不 fire(M29 anchor preflight / SSOT propagation 等)
+  - DS governance hooks(M29 anchor preflight / SSOT propagation 等,40+ 個)全部不 fire
   - product-workspace 視覺直接跑版,fork user 抓不到 root cause
 
 ${BOLD}修法(用 Claude Code 開本 repo 後第一件事):${RESET}
@@ -55,7 +55,7 @@ ${BOLD}修法(用 Claude Code 開本 repo 後第一件事):${RESET}
   2. ${YELLOW}/plugin install design-system@qijenchen-ds${RESET}
 
 ${BOLD}Plugin install 後拿到:${RESET}
-  ✓ 41 個 DS governance hooks(自動 fire)
+  ✓ 40+ 個 DS governance hooks(自動 fire,dynamic — 跟 DS repo 同步)
   ✓ 22 個 skills(/prototype / /component-quality-gate / /design-system-audit 等)
   ✓ DS canonical(31 M-rules + 56 audit dims + ssot-index)cross-load
   ✓ App.tsx 憑記憶寫 mock 會被 mechanical BLOCKER 攔
