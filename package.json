@@ -21,7 +21,7 @@
     "postinstall": "node scripts/check-plugin-installed.mjs"
   },
   "dependencies": {
-    "@qijenchen/design-system": "^0.1.0-beta.23",
+    "@qijenchen/design-system": "file:../../../Users/chenqiren/Library/CloudStorage/GoogleDrive-qijenchen@gmail.com/我的雲端硬碟/my-project/packages/design-system",
     "@qijenchen/storybook-config": "^0.1.0-beta.23",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
