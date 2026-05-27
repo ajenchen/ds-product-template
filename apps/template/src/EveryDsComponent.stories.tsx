@@ -34,6 +34,7 @@ export const EveryComponent: Story = {
     const [segVal, setSegVal] = useState('list')
     const [stepsVal, setStepsVal] = useState('s1')
     return (
+      <DS.TooltipProvider delayDuration={500} skipDelayDuration={300}>
       <div className="p-6 grid grid-cols-3 gap-3" data-testid="every-ds-components">
 
         {/* ── Atomic ───────────────────────────────────── */}
@@ -44,7 +45,7 @@ export const EveryComponent: Story = {
         <Box name="Button-secondary"><DS.Button variant="secondary">Secondary</DS.Button></Box>
         <Box name="Button-text"><DS.Button variant="text">Text</DS.Button></Box>
         <Box name="Tag"><DS.Tag>Tag</DS.Tag></Box>
-        <Box name="Chip"><DS.Chip value="x">Chip</DS.Chip></Box>
+        <Box name="Chip"><DS.ChipGroup type="single"><DS.Chip value="x">Chip</DS.Chip></DS.ChipGroup></Box>
         <Box name="Separator"><DS.Separator /></Box>
         <Box name="ItemIcon"><DS.ItemIcon icon={Home} /></Box>
         <Box name="ItemLabel"><DS.ItemLabel>Label</DS.ItemLabel></Box>
@@ -227,6 +228,7 @@ export const EveryComponent: Story = {
           (<a href="https://ajenchen.github.io/design-system/">link</a>)。
         </p>
       </div>
+      </DS.TooltipProvider>
     )
   },
 }
