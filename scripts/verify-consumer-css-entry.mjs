@@ -9,24 +9,46 @@
 //     3. `@source '...design-system...src...'` — Tailwind scan DS 元件原始碼產對應 utility(缺 → DS 元件 unstyled「沒吃到元件」bug)
 //   過去這 3 個都各 drift 過(font / 沒吃到元件)。本 script = 那層缺失的機械保證。
 //
-// Scan:apps/<app>/src/globals.css + <root>/.storybook/*.css(consumer-facing 入口)。
-//   不檢 DS repo 自己的 src/globals.css(它用個別 token import,非 consumer 路徑)。
+// Scan:遞迴掃 apps/ + .storybook/ + template/ + src/ 全部 .css,抓所有 Tailwind 入口(`@import 'tailwindcss'`),
+//   排除 DS-internal dev 入口(用相對 workspace path import DS 的 repo-root globals.css),其餘視為 consumer 入口必檢。
+//   2026-05-29 加固:從固定候選路徑改遞迴掃描 → 非標準路徑/檔名的 consumer 入口也抓得到(codex Q4 boundary #1 閉合)。
 // 用法:node scripts/verify-consumer-css-entry.mjs(CI / 手動)。fork repo 同 script 自驗。
 
 import { readFileSync, existsSync, readdirSync } from 'node:fs'
-import { globSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 
-// Consumer CSS 入口候選(DS repo + fork repo 通用)。
-const candidates = [
-  ...globSync('apps/*/src/globals.css', { cwd: ROOT }),
-  ...globSync('.storybook/*.css', { cwd: ROOT }),
-  // DS repo 內 template scaffold(會 mirror 到 published)
-  'template/ds-product-template/.storybook/storybook.css',
-].filter((p) => existsSync(join(ROOT, p)))
+const TAILWIND_ENTRY = /@import\s+['"]tailwindcss['"]/
+// DS-internal dev 入口(repo-root src/globals.css)用相對 workspace path import DS,合法用個別 token import + 相對 base.css,
+// 非 consumer 路徑 → 排除,不要求 npm-path 的 tokens aggregator import。
+const DS_INTERNAL = /@import\s+['"]\.\.?\/[^'"]*packages\/(design-system|storybook-config)/
+
+// 2026-05-29 加固(user「做到完美」+ codex Q4 boundary #1):不再只掃固定候選路徑,
+// 改遞迴掃 consumer 領域全部 .css → 抓所有 Tailwind 入口(含非標準路徑檔名)→ 排除 DS-internal → 其餘必須完整。
+// 用手寫 walker 而非 fs.globSync:後者 `**` 不匹配 dot 目錄(.storybook)→ 會漏 storybook 入口。
+const SKIP_DIR = new Set(['node_modules', 'dist', 'storybook-static', '.git'])
+function walkCss(rel) {
+  const abs = join(ROOT, rel)
+  if (!existsSync(abs)) return []
+  const out = []
+  for (const e of readdirSync(abs, { withFileTypes: true })) {
+    if (SKIP_DIR.has(e.name)) continue
+    const child = rel ? `${rel}/${e.name}` : e.name
+    if (e.isDirectory()) out.push(...walkCss(child))
+    else if (e.name.endsWith('.css')) out.push(child)
+  }
+  return out
+}
+const SCAN_DIRS = ['apps', '.storybook', 'template', 'src']
+const allCss = SCAN_DIRS.flatMap(walkCss)
+
+// Consumer 入口 = Tailwind 入口 且 非 DS-internal dev 入口。
+const candidates = allCss.filter((p) => {
+  const css = readFileSync(join(ROOT, p), 'utf8')
+  return TAILWIND_ENTRY.test(css) && !DS_INTERNAL.test(css)
+})
 
 const REQUIRED = [
   { name: "@import 'tailwindcss'", re: /@import\s+['"]tailwindcss['"]/ },
