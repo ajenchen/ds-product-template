@@ -2,10 +2,6 @@
 // (per `.claude/rules/story-rules.md`「Production-grade composition fidelity」+ M23(d) nearest-same-purpose canonical wins)
 //
 // @story-baseline: @qijenchen/design-system/components/Sidebar/sidebar.stories.tsx#IconCollapse
-// @composition-fidelity-mode: shell-only
-// @composition-fidelity-mask: main, [data-mask="content"]
-// (per 2026-05-27 user 反覆 visual drift report:此 template AppShell 的 inner page content 跟 DS canonical 不同
-//  是設計刻意,只需驗 shell chrome(sidebar + chrome header + footer)結構對齊;mask `<main>` 內 page content。)
 //
 // SSOT 鐵律:
 //   - Consumer 只 import `@qijenchen/design-system` public exports
