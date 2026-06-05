@@ -1,5 +1,5 @@
 // Chat prototype — 3-column messaging UI(Nav rail / Chat list / Conversation + Thread panel)
-// v3: custom status dots / mute-avatar / favorite-move / my-bubble #EBEEFF / thread panel 480px
+// v3.1: tooltip fix / overflow fix / header mute / status outside bubble / reaction menus / thread panel cleanup
 
 import { useEffect, useRef, useState } from 'react'
 import {
@@ -23,6 +23,9 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
   ResizeHandle,
   Dialog,
   DialogContent,
@@ -64,6 +67,11 @@ import {
   Check,
   CheckCheck,
   X,
+  Copy,
+  Pin,
+  Forward,
+  Trash2,
+  ChevronRight as SubArrow,
 } from 'lucide-react'
 
 // ── Shared button primitives ──────────────────────────────────────────────────
@@ -83,12 +91,14 @@ function NavBtn({
   return (
     <Tooltip>
       <TooltipTrigger asChild>
+        {/* title="" suppresses the browser-native tooltip from aria-label */}
         <Button
           variant="text"
           size="md"
           iconOnly
           startIcon={icon}
           aria-label={label}
+          title=""
           onClick={onClick}
           overlayBadge={overlayBadge}
           className={active ? '!bg-neutral-selected' : ''}
@@ -111,7 +121,7 @@ function ListBtn({
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Button variant="text" size="sm" iconOnly startIcon={icon} aria-label={label} onClick={onClick} />
+        <Button variant="text" size="sm" iconOnly startIcon={icon} aria-label={label} title="" onClick={onClick} />
       </TooltipTrigger>
       <TooltipContent>{label}</TooltipContent>
     </Tooltip>
@@ -130,7 +140,7 @@ function IconBtnSm({
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Button variant="text" size="sm" iconOnly startIcon={icon} aria-label={label} onClick={onClick} />
+        <Button variant="text" size="sm" iconOnly startIcon={icon} aria-label={label} title="" onClick={onClick} />
       </TooltipTrigger>
       <TooltipContent>{label}</TooltipContent>
     </Tooltip>
@@ -257,16 +267,11 @@ const ROOMS: Room[] = [
 
 const COMMON_EMOJI = ['👍', '❤️', '😂', '🎉']
 
-// ── Status dot — custom presence indicator ─────────────────────────────────────
-// online=green solid / busy=red solid / away=yellow clock / offline=gray outline
+// ── Status dot ────────────────────────────────────────────────────────────────
 function StatusDot({ status }: { status: Presence }) {
   const base = 'flex items-center justify-center rounded-full ring-1 ring-surface'
-  if (status === 'online') {
-    return <span className={`${base} bg-green-500`} style={{ width: 10, height: 10 }} />
-  }
-  if (status === 'busy') {
-    return <span className={`${base} bg-red-500`} style={{ width: 10, height: 10 }} />
-  }
+  if (status === 'online') return <span className={`${base} bg-green-500`} style={{ width: 10, height: 10 }} />
+  if (status === 'busy') return <span className={`${base} bg-red-500`} style={{ width: 10, height: 10 }} />
   if (status === 'away') {
     return (
       <span className={`${base} bg-yellow-400`} style={{ width: 12, height: 12 }}>
@@ -274,7 +279,6 @@ function StatusDot({ status }: { status: Presence }) {
       </span>
     )
   }
-  // offline — gray outline
   return <span className={`${base} border-2 border-neutral-400 bg-transparent`} style={{ width: 10, height: 10 }} />
 }
 
@@ -295,17 +299,10 @@ function makeProfileCard(p: Person) {
   )
 }
 
-// PersonAvatar — custom StatusDot overlay, no DS built-in status dot
 function PersonAvatar({ person, size = 32 }: { person: Person; size?: number }) {
   return (
     <div className="relative inline-flex shrink-0">
-      <Avatar
-        src={person.avatar}
-        alt={person.name}
-        color={person.color}
-        size={size}
-        hoverCard={makeProfileCard(person)}
-      />
+      <Avatar src={person.avatar} alt={person.name} color={person.color} size={size} hoverCard={makeProfileCard(person)} />
       <span className="absolute -bottom-0.5 -right-0.5 z-10">
         <StatusDot status={person.status} />
       </span>
@@ -313,7 +310,6 @@ function PersonAvatar({ person, size = 32 }: { person: Person; size?: number }) 
   )
 }
 
-// GroupAvatar — neutral-6 bg + MessagesSquare icon
 function GroupAvatar({ size = 32 }: { size?: number }) {
   return (
     <Avatar
@@ -325,7 +321,6 @@ function GroupAvatar({ size = 32 }: { size?: number }) {
   )
 }
 
-// MutedAvatar — white bg + gray BellOff icon (replaces normal avatar when muted)
 function MutedAvatar({ size = 32 }: { size?: number }) {
   return (
     <div
@@ -352,23 +347,15 @@ function SettingsModal({
   onConfirm: (v: boolean) => void
 }) {
   const [draft, setDraft] = useState(showPreview)
-
-  useEffect(() => {
-    if (open) setDraft(showPreview)
-  }, [open, showPreview])
+  useEffect(() => { if (open) setDraft(showPreview) }, [open, showPreview])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl p-0 overflow-hidden">
         <div className="flex h-[480px]">
           <nav className="flex w-44 shrink-0 flex-col gap-0.5 border-r border-divider bg-surface p-3">
-            <p className="px-2 pb-1 pt-0.5 text-caption font-semibold uppercase tracking-wide text-fg-secondary">
-              Settings
-            </p>
-            <button
-              type="button"
-              className="flex w-full items-center gap-2 rounded-md bg-neutral-selected px-2 py-1.5 text-left text-body font-medium text-foreground"
-            >
+            <p className="px-2 pb-1 pt-0.5 text-caption font-semibold uppercase tracking-wide text-fg-secondary">Settings</p>
+            <button type="button" className="flex w-full items-center gap-2 rounded-md bg-neutral-selected px-2 py-1.5 text-left text-body font-medium text-foreground">
               <MessagesSquare size={15} />
               Chats
             </button>
@@ -381,18 +368,14 @@ function SettingsModal({
               <div className="flex items-center justify-between gap-4 rounded-lg py-3">
                 <div>
                   <p className="text-body font-medium">Show message previews for chats</p>
-                  <p className="text-caption text-fg-secondary mt-0.5">
-                    Display the latest message below each chat name
-                  </p>
+                  <p className="text-caption text-fg-secondary mt-0.5">Display the latest message below each chat name</p>
                 </div>
                 <Switch checked={draft} onCheckedChange={setDraft} aria-label="Show message previews for chats" />
               </div>
             </div>
             <DialogFooter className="border-t border-divider px-6 py-3">
               <Button variant="text" onClick={() => onOpenChange(false)}>Cancel</Button>
-              <Button variant="primary" onClick={() => { onConfirm(draft); onOpenChange(false) }}>
-                Save changes
-              </Button>
+              <Button variant="primary" onClick={() => { onConfirm(draft); onOpenChange(false) }}>Save changes</Button>
             </DialogFooter>
           </div>
         </div>
@@ -429,9 +412,7 @@ function NavRail({ unreadCount, onOpenSettings }: { unreadCount: number; onOpenS
       <div className="flex h-10 items-center justify-center">
         <Logo />
       </div>
-      <div className="w-8 py-1">
-        <Separator />
-      </div>
+      <div className="w-8 py-1"><Separator /></div>
       <div className="flex flex-col gap-1 py-1">
         <NavBtn icon={Home} label="Home" active={tab === 'home'} onClick={() => setTab('home')} />
         <NavBtn
@@ -443,11 +424,12 @@ function NavRail({ unreadCount, onOpenSettings }: { unreadCount: number; onOpenS
         />
       </div>
       <div className="mt-auto flex flex-col items-center gap-1 py-1">
+        {/* More menu — single Tooltip wrapping the trigger */}
         <DropdownMenu>
           <Tooltip>
             <TooltipTrigger asChild>
               <DropdownMenuTrigger asChild>
-                <Button variant="text" size="md" iconOnly startIcon={MoreHorizontal} aria-label="More" />
+                <Button variant="text" size="md" iconOnly startIcon={MoreHorizontal} aria-label="More" title="" />
               </DropdownMenuTrigger>
             </TooltipTrigger>
             <TooltipContent side="right">More</TooltipContent>
@@ -474,7 +456,7 @@ function AddPopover() {
       <Tooltip>
         <TooltipTrigger asChild>
           <PopoverTrigger asChild>
-            <Button variant="text" size="sm" iconOnly startIcon={Plus} aria-label="Add" />
+            <Button variant="text" size="sm" iconOnly startIcon={Plus} aria-label="Add" title="" />
           </PopoverTrigger>
         </TooltipTrigger>
         <TooltipContent>Add</TooltipContent>
@@ -491,17 +473,7 @@ function AddPopover() {
   )
 }
 
-function Section({
-  label,
-  open,
-  onToggle,
-  trailing,
-}: {
-  label: string
-  open: boolean
-  onToggle: () => void
-  trailing?: React.ReactNode
-}) {
+function Section({ label, open, onToggle, trailing }: { label: string; open: boolean; onToggle: () => void; trailing?: React.ReactNode }) {
   return (
     <div className="mt-2 flex items-center gap-1 px-1">
       <button
@@ -517,7 +489,6 @@ function Section({
   )
 }
 
-// RoomMoreMenu — muted/unmuted state + favorite/unfavorite based on section
 function RoomMoreMenu({
   room,
   isMuted,
@@ -536,23 +507,17 @@ function RoomMoreMenu({
       <Tooltip>
         <TooltipTrigger asChild>
           <DropdownMenuTrigger asChild>
-            <Button variant="text" size="sm" iconOnly startIcon={MoreHorizontal} aria-label="More" />
+            <Button variant="text" size="sm" iconOnly startIcon={MoreHorizontal} aria-label="More" title="" />
           </DropdownMenuTrigger>
         </TooltipTrigger>
         <TooltipContent>More</TooltipContent>
       </Tooltip>
-      <DropdownMenuContent align="end" sideOffset={8}>
-        <DropdownMenuItem
-          startIcon={isMuted ? Bell : BellOff}
-          onSelect={onToggleMute}
-        >
+      {/* align="start" side="bottom" sideOffset=8 — dropdown appears below trigger, left-aligned, 8px gap */}
+      <DropdownMenuContent align="end" side="bottom" sideOffset={8}>
+        <DropdownMenuItem startIcon={isMuted ? Bell : BellOff} onSelect={onToggleMute}>
           {isMuted ? 'Unmute' : 'Mute'}
         </DropdownMenuItem>
-        <DropdownMenuItem
-          startIcon={Star}
-          className={isFavorite ? 'font-semibold' : ''}
-          onSelect={onToggleFavorite}
-        >
+        <DropdownMenuItem startIcon={Star} onSelect={onToggleFavorite}>
           {isFavorite ? 'Unfavorite' : 'Favorite'}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
@@ -569,7 +534,7 @@ function RoomMoreMenu({
   )
 }
 
-// RoomRow — two-line preview with time on right, unread dot on right of preview line
+// RoomRow — two-line preview. Right-side time + badge are shrink-0 to prevent clipping on resize.
 function RoomRow({
   room,
   active,
@@ -596,12 +561,12 @@ function RoomRow({
 
   return (
     <div
-      className={`group relative flex cursor-pointer items-center gap-2.5 rounded-lg px-2 ${
+      className={`group relative flex cursor-pointer items-center gap-2 rounded-lg px-2 ${
         showPreview ? 'py-2' : 'py-1.5'
       } ${active ? 'bg-neutral-selected' : 'hover:bg-neutral-hover'}`}
       onClick={() => onSelect(room.id)}
     >
-      {/* Avatar — muted shows BellOff icon */}
+      {/* Avatar */}
       {isMuted ? (
         <MutedAvatar size={avatarSize} />
       ) : room.type === 'dm' && room.person ? (
@@ -610,28 +575,26 @@ function RoomRow({
         <GroupAvatar size={avatarSize} />
       )}
 
-      {/* Text content */}
+      {/* Text content — min-w-0 flex-1 allows truncation without clipping right-side items */}
       {showPreview ? (
-        <div className="min-w-0 flex-1 overflow-hidden">
-          {/* Line 1: name (left) + time (right) */}
+        <div className="min-w-0 flex-1">
+          {/* Line 1: name (flex-1 truncate) + time (shrink-0, always visible) */}
           <div className="flex items-baseline gap-1">
             <span
-              className="min-w-0 flex-1 truncate text-foreground"
-              style={{ fontSize: 14, fontWeight: room.unread && !isMuted ? 600 : 400 }}
+              className="min-w-0 flex-1 truncate"
+              style={{ fontSize: 14, fontWeight: room.unread && !isMuted ? 600 : 400, color: 'var(--foreground)' }}
             >
               {room.title}
             </span>
-            {/* Time on right of name line — hidden on hover (more button covers) */}
             <span className="shrink-0 text-fg-secondary group-hover:invisible" style={{ fontSize: 12 }}>
               {latestMsg?.time ?? ''}
             </span>
           </div>
-          {/* Line 2: preview (left) + unread dot (right) */}
+          {/* Line 2: preview (flex-1 truncate) + unread dot (shrink-0) */}
           <div className="flex items-center gap-1">
-            <p className="min-w-0 flex-1 truncate text-fg-secondary" style={{ fontSize: 12, color: 'var(--color-neutral-8)' }}>
+            <p className="min-w-0 flex-1 truncate text-fg-secondary" style={{ fontSize: 12 }}>
               {previewText}
             </p>
-            {/* Unread dot on right of preview line — hidden on hover */}
             {room.unread && !isMuted && (
               <span className="shrink-0 group-hover:invisible">
                 <Badge dot variant="critical" />
@@ -641,18 +604,15 @@ function RoomRow({
         </div>
       ) : (
         <span
-          className="min-w-0 flex-1 truncate text-foreground"
-          style={{ fontSize: 14, fontWeight: room.unread && !isMuted ? 600 : 400 }}
+          className="min-w-0 flex-1 truncate"
+          style={{ fontSize: 14, fontWeight: room.unread && !isMuted ? 600 : 400, color: 'var(--foreground)' }}
         >
           {room.title}
         </span>
       )}
 
-      {/* Hover: more button, absolute right-2, covers time+dot */}
-      <div
-        className="absolute right-2 hidden group-hover:block"
-        onClick={(e) => e.stopPropagation()}
-      >
+      {/* Hover: more button overlays the right-side items */}
+      <div className="absolute right-2 hidden group-hover:block" onClick={(e) => e.stopPropagation()}>
         <RoomMoreMenu
           room={room}
           isMuted={isMuted}
@@ -732,47 +692,28 @@ function ChatList({
           <Section label="Favorites" open={openFav} onToggle={() => setOpenFav((v) => !v)} />
           {openFav && favorites.map((r) => (
             <RoomRow
-              key={r.id}
-              room={r}
-              active={r.id === activeId}
-              isMuted={mutedIds.has(r.id)}
-              isFavorite={true}
-              onSelect={onSelect}
-              onToggleMute={onToggleMute}
-              onToggleFavorite={onToggleFavorite}
+              key={r.id} room={r} active={r.id === activeId}
+              isMuted={mutedIds.has(r.id)} isFavorite={true}
+              onSelect={onSelect} onToggleMute={onToggleMute} onToggleFavorite={onToggleFavorite}
               showPreview={showPreview}
             />
           ))}
-
           <Section
-            label="Chats"
-            open={openChats}
-            onToggle={() => setOpenChats((v) => !v)}
+            label="Chats" open={openChats} onToggle={() => setOpenChats((v) => !v)}
             trailing={<ListBtn icon={Plus} label="Add chat" />}
           />
           {openChats && chats.map((r) => (
             <RoomRow
-              key={r.id}
-              room={r}
-              active={r.id === activeId}
-              isMuted={mutedIds.has(r.id)}
-              isFavorite={false}
-              onSelect={onSelect}
-              onToggleMute={onToggleMute}
-              onToggleFavorite={onToggleFavorite}
+              key={r.id} room={r} active={r.id === activeId}
+              isMuted={mutedIds.has(r.id)} isFavorite={false}
+              onSelect={onSelect} onToggleMute={onToggleMute} onToggleFavorite={onToggleFavorite}
               showPreview={showPreview}
             />
           ))}
         </div>
       </ScrollArea>
 
-      <ResizeHandle
-        direction="horizontal"
-        position="end"
-        isResizing={dragging}
-        aria-label="拖曳調整聊天列表寬度"
-        onPointerDown={startResize}
-      />
+      <ResizeHandle direction="horizontal" position="end" isResizing={dragging} aria-label="拖曳調整聊天列表寬度" onPointerDown={startResize} />
     </aside>
   )
 }
@@ -784,7 +725,7 @@ function TeamsCallButton() {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Button variant="text" size="md" startIcon={Video} endIcon={ChevronDown} aria-label="Teams call" />
+        <Button variant="text" size="md" startIcon={Video} endIcon={ChevronDown} aria-label="Teams call" title="" />
       </TooltipTrigger>
       <TooltipContent>Teams call</TooltipContent>
     </Tooltip>
@@ -795,10 +736,8 @@ function RoomInfoButton({ count }: { count: number }) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Button variant="text" size="md" startIcon={Users} aria-label="Room information">
-          <span className="rounded-md bg-muted px-1.5 py-0.5 text-caption font-medium text-fg-secondary">
-            {count}
-          </span>
+        <Button variant="text" size="md" startIcon={Users} aria-label="Room information" title="">
+          <span className="rounded-md bg-muted px-1.5 py-0.5 text-caption font-medium text-fg-secondary">{count}</span>
         </Button>
       </TooltipTrigger>
       <TooltipContent>Room information</TooltipContent>
@@ -806,18 +745,27 @@ function RoomInfoButton({ count }: { count: number }) {
   )
 }
 
-function HeaderMoreMenu({ type }: { type: 'dm' | 'general' }) {
+// Header more menu — mute/unmute aware
+function HeaderMoreMenu({
+  type,
+  isMuted,
+  onToggleMute,
+}: {
+  type: 'dm' | 'general'
+  isMuted: boolean
+  onToggleMute: () => void
+}) {
   return (
     <DropdownMenu>
       <Tooltip>
         <TooltipTrigger asChild>
           <DropdownMenuTrigger asChild>
-            <Button variant="text" size="md" iconOnly startIcon={MoreHorizontal} aria-label="More" />
+            <Button variant="text" size="md" iconOnly startIcon={MoreHorizontal} aria-label="More" title="" />
           </DropdownMenuTrigger>
         </TooltipTrigger>
         <TooltipContent>More</TooltipContent>
       </Tooltip>
-      <DropdownMenuContent align="end" sideOffset={8}>
+      <DropdownMenuContent align="end" side="bottom" sideOffset={8}>
         {type === 'general' && (
           <>
             <DropdownMenuItem startIcon={Users}>Room information</DropdownMenuItem>
@@ -825,7 +773,9 @@ function HeaderMoreMenu({ type }: { type: 'dm' | 'general' }) {
           </>
         )}
         <DropdownMenuItem startIcon={Maximize2}>Full width</DropdownMenuItem>
-        <DropdownMenuItem startIcon={BellOff}>Mute</DropdownMenuItem>
+        <DropdownMenuItem startIcon={isMuted ? Bell : BellOff} onSelect={onToggleMute}>
+          {isMuted ? 'Unmute' : 'Mute'}
+        </DropdownMenuItem>
         <DropdownMenuItem startIcon={Star}>Favorite</DropdownMenuItem>
         {type === 'general' && (
           <>
@@ -838,40 +788,61 @@ function HeaderMoreMenu({ type }: { type: 'dm' | 'general' }) {
   )
 }
 
+// ConversationHeader — shows mute overlay on avatar when room is muted
 function ConversationHeader({
   room,
   listOpen,
   onExpandList,
+  isMuted,
+  onToggleMute,
 }: {
   room: Room
   listOpen: boolean
   onExpandList: () => void
+  isMuted: boolean
+  onToggleMute: () => void
 }) {
   const memberCount = room.memberKeys?.length ?? 0
+
+  // Avatar with optional mute badge overlay
+  const roomAvatar = isMuted ? (
+    // Muted: show the normal avatar but with a BellOff badge overlay
+    <div className="relative shrink-0">
+      {room.type === 'dm' && room.person ? (
+        <PersonAvatar person={room.person} size={36} />
+      ) : (
+        <GroupAvatar size={36} />
+      )}
+      <span className="absolute -bottom-0.5 -right-0.5 z-20 flex items-center justify-center rounded-full bg-surface-raised border border-divider" style={{ width: 16, height: 16 }}>
+        <BellOff size={9} className="text-fg-secondary" />
+      </span>
+    </div>
+  ) : room.type === 'dm' && room.person ? (
+    <PersonAvatar person={room.person} size={36} />
+  ) : (
+    <GroupAvatar size={36} />
+  )
+
   return (
     <header className="flex items-center gap-2.5 h-[var(--chrome-header-height)] px-4 border-b border-divider bg-surface shrink-0">
       {!listOpen && (
         <>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="text" size="md" iconOnly startIcon={PanelLeftOpen} aria-label="Expand sidebar" onClick={onExpandList} />
+              <Button variant="text" size="md" iconOnly startIcon={PanelLeftOpen} aria-label="Expand sidebar" title="" onClick={onExpandList} />
             </TooltipTrigger>
             <TooltipContent>Expand sidebar</TooltipContent>
           </Tooltip>
           <Separator orientation="vertical" className="h-6" />
         </>
       )}
-      {room.type === 'dm' && room.person ? (
-        <PersonAvatar person={room.person} size={36} />
-      ) : (
-        <GroupAvatar size={36} />
-      )}
+      {roomAvatar}
       <div className="flex min-w-0 flex-1 items-center gap-1.5">
         <h1 className="truncate text-body-lg font-semibold">{room.title}</h1>
         {room.type === 'general' && (
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="text" size="md" iconOnly startIcon={Pencil} aria-label="Edit chatroom name" />
+              <Button variant="text" size="md" iconOnly startIcon={Pencil} aria-label="Edit chatroom name" title="" />
             </TooltipTrigger>
             <TooltipContent>Edit name</TooltipContent>
           </Tooltip>
@@ -882,32 +853,86 @@ function ConversationHeader({
         {room.type === 'general' && <RoomInfoButton count={memberCount} />}
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="text" size="md" iconOnly startIcon={Search} aria-label="Search" />
+            <Button variant="text" size="md" iconOnly startIcon={Search} aria-label="Search" title="" />
           </TooltipTrigger>
           <TooltipContent>Search</TooltipContent>
         </Tooltip>
-        <HeaderMoreMenu type={room.type} />
+        <HeaderMoreMenu type={room.type} isMuted={isMuted} onToggleMute={onToggleMute} />
       </div>
     </header>
   )
 }
 
-// Message read/sent/sending status icon
+// Message status icon (outside bubble)
 function MsgStatusIcon({ status }: { status: MsgStatus }) {
   if (status === 'sending') return <Clock size={12} className="text-fg-secondary" />
   if (status === 'sent') return <Check size={12} className="text-fg-secondary" />
   return <CheckCheck size={12} className="text-primary" />
 }
 
-function ReactionBar({ onOpenThread }: { onOpenThread: () => void }) {
+// Reaction bar more menu — different actions for mine vs other
+function ReactionMoreMenu({
+  mine,
+  room,
+}: {
+  mine: boolean
+  room: Room
+}) {
+  // Derive member count and read members for "Read by" (prototype: all non-me members read)
+  const memberCount = room.type === 'general'
+    ? (room.memberKeys?.length ?? 1)
+    : 1
+  const readCount = memberCount  // prototype: everyone has read
+
+  const readMembers = room.type === 'general'
+    ? (room.memberKeys ?? []).map((k) => PEOPLE[k]?.name.split(' ')[0]).filter(Boolean)
+    : room.person ? [room.person.name.split(' ')[0]] : []
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="text" size="sm" iconOnly startIcon={MoreHorizontal} aria-label="More actions" title="" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" side="bottom" sideOffset={8}>
+        {mine ? (
+          <>
+            <DropdownMenuItem startIcon={Reply}>Reply with quote</DropdownMenuItem>
+            <DropdownMenuItem startIcon={Copy}>Copy</DropdownMenuItem>
+            <DropdownMenuItem startIcon={Pin}>Pin</DropdownMenuItem>
+            <DropdownMenuItem startIcon={Forward}>Forward</DropdownMenuItem>
+            <DropdownMenuItem startIcon={Trash2} className="text-fg-error">Delete</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            {/* Read by — hover opens submenu with reader list */}
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                Read by {readCount} of {memberCount}
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent sideOffset={8}>
+                {readMembers.map((name) => (
+                  <DropdownMenuItem key={name}>{name}</DropdownMenuItem>
+                ))}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+          </>
+        ) : (
+          <>
+            <DropdownMenuItem startIcon={Copy}>Copy</DropdownMenuItem>
+            <DropdownMenuItem startIcon={Pin}>Pin</DropdownMenuItem>
+            <DropdownMenuItem startIcon={Forward}>Forward</DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+function ReactionBar({ onOpenThread, mine, room }: { onOpenThread: () => void; mine: boolean; room: Room }) {
   return (
     <div className="absolute -top-4 right-2 z-10 hidden items-center gap-0.5 rounded-lg border border-divider bg-surface-raised p-0.5 shadow-md group-hover/msg:flex">
       {COMMON_EMOJI.map((e) => (
         <Tooltip key={e}>
           <TooltipTrigger asChild>
-            <button type="button" aria-label={`React ${e}`} className="rounded-md px-1.5 py-1 text-body hover:bg-neutral-hover">
-              {e}
-            </button>
+            <button type="button" aria-label={`React ${e}`} className="rounded-md px-1.5 py-1 text-body hover:bg-neutral-hover">{e}</button>
           </TooltipTrigger>
           <TooltipContent>{e}</TooltipContent>
         </Tooltip>
@@ -916,7 +941,7 @@ function ReactionBar({ onOpenThread }: { onOpenThread: () => void }) {
       <Separator orientation="vertical" className="mx-0.5 h-5" />
       <IconBtnSm icon={MessagesSquare} label="Reply in thread" onClick={onOpenThread} />
       <IconBtnSm icon={Reply} label="Reply with quote" />
-      <IconBtnSm icon={MoreHorizontal} label="More" />
+      <ReactionMoreMenu mine={mine} room={room} />
     </div>
   )
 }
@@ -925,17 +950,19 @@ function MessageBubble({
   message,
   isLastMine,
   onOpenThread,
+  room,
 }: {
   message: Message
   isLastMine: boolean
   onOpenThread: (m: Message) => void
+  room: Room
 }) {
   const mine = message.author === 'me'
   const author = mine ? null : PEOPLE[message.author] ?? null
 
   return (
     <div className={`group/msg flex flex-col ${mine ? 'items-end' : 'items-start'}`}>
-      <div className={`flex items-start gap-2 ${mine ? 'flex-row-reverse' : ''} max-w-[78%]`}>
+      <div className={`flex items-start gap-2 ${mine ? 'flex-row-reverse' : ''} max-w-[80%]`}>
         {/* Other user avatar — top-aligned with name */}
         {!mine && author && (
           <div className="mt-0.5 shrink-0">
@@ -946,12 +973,12 @@ function MessageBubble({
         <div className="flex flex-col gap-0.5 min-w-0">
           {/* My message: time above bubble */}
           {mine && (
-            <div className="flex items-center justify-end gap-1.5 pr-1">
+            <div className="flex justify-end pr-1">
               <span className="text-caption text-fg-secondary">{message.time}</span>
             </div>
           )}
 
-          {/* Other: name + time above bubble (top-aligned with avatar) */}
+          {/* Other: name + time (12px neutral-7) above bubble */}
           {!mine && author && (
             <div className="flex items-center gap-1.5 mb-0.5">
               <span style={{ fontSize: 12, color: 'var(--color-neutral-7)', fontWeight: 500 }}>{author.name}</span>
@@ -959,47 +986,62 @@ function MessageBubble({
             </div>
           )}
 
-          {/* Bubble */}
-          <div className="relative">
-            <ReactionBar onOpenThread={() => onOpenThread(message)} />
-            <div
-              className={`rounded-2xl px-3.5 py-2.5 text-body ${
-                mine ? 'rounded-tr-sm text-foreground' : 'rounded-tl-sm bg-muted text-foreground'
-              }`}
-              style={mine ? { backgroundColor: '#EBEEFF' } : undefined}
-            >
-              <p className="whitespace-pre-wrap break-words">{message.text}</p>
-              {message.reactions && message.reactions.length > 0 && (
-                <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                  {message.reactions.map((r) => (
-                    <span key={r.emoji} className="flex items-center gap-1 rounded-full bg-surface px-2 py-0.5 text-caption">
-                      <span>{r.emoji}</span>
-                      <span className="text-fg-secondary">{r.count}</span>
-                    </span>
-                  ))}
-                  <button type="button" aria-label="Add reaction" className="flex items-center rounded-full bg-surface px-1.5 py-1 text-fg-secondary hover:text-foreground">
-                    <SmilePlus size={14} />
-                  </button>
-                </div>
-              )}
-              {/* Read/sent/sending status — only on newest mine bubble, bottom-right */}
-              {mine && isLastMine && message.msgStatus && (
-                <div className="mt-1 flex justify-end">
-                  <MsgStatusIcon status={message.msgStatus} />
-                </div>
-              )}
+          {/* Bubble row: bubble + status icon to the right (mine only, 8px gap) */}
+          <div className={`flex items-end gap-2 ${mine ? 'flex-row-reverse' : ''}`}>
+            {/* Status icon: right of bubble for mine, bottom-aligned, 8px gap */}
+            {mine && isLastMine && message.msgStatus && (
+              <span className="shrink-0 pb-1">
+                <MsgStatusIcon status={message.msgStatus} />
+              </span>
+            )}
+
+            {/* Bubble */}
+            <div className="relative min-w-0">
+              <ReactionBar onOpenThread={() => onOpenThread(message)} mine={mine} room={room} />
+              <div
+                className={`rounded-2xl px-3.5 py-2.5 text-body ${
+                  mine ? 'rounded-tr-sm text-foreground' : 'rounded-tl-sm bg-muted text-foreground'
+                }`}
+                style={mine ? { backgroundColor: '#EBEEFF' } : undefined}
+              >
+                <p className="whitespace-pre-wrap break-words">{message.text}</p>
+                {message.reactions && message.reactions.length > 0 && (
+                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                    {message.reactions.map((r) => (
+                      <span key={r.emoji} className="flex items-center gap-1 rounded-full bg-surface px-2 py-0.5 text-caption">
+                        <span>{r.emoji}</span>
+                        <span className="text-fg-secondary">{r.count}</span>
+                      </span>
+                    ))}
+                    <button type="button" aria-label="Add reaction" className="flex items-center rounded-full bg-surface px-1.5 py-1 text-fg-secondary hover:text-foreground">
+                      <SmilePlus size={14} />
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* Thread replies — with L-shaped connector line */}
-          {message.replies != null && message.replies > 0 && (
-            <div className="relative mt-0.5 flex items-center" style={{ marginLeft: mine ? 0 : 0 }}>
-              {!mine && (
-                <span
-                  className="absolute border-l-2 border-b-2 border-neutral-300 rounded-bl"
-                  style={{ left: -24, top: -8, height: 14, width: 16 }}
-                />
-              )}
+          {/* Thread replies — L-line left edge aligns with bubble left edge */}
+          {!mine && message.replies != null && message.replies > 0 && (
+            <div className="mt-0.5 flex items-center gap-1.5">
+              {/* L-shaped connector: left edge = bubble left edge (x=0 in this column) */}
+              <div
+                className="shrink-0 border-l-2 border-b-2 border-neutral-300 rounded-bl"
+                style={{ width: 12, height: 10 }}
+              />
+              <button
+                type="button"
+                className="flex items-center gap-1.5 text-caption text-info-text hover:underline"
+                onClick={() => onOpenThread(message)}
+              >
+                <MessagesSquare size={14} />
+                {message.replies} replies
+              </button>
+            </div>
+          )}
+          {mine && message.replies != null && message.replies > 0 && (
+            <div className="mt-0.5 flex justify-end">
               <button
                 type="button"
                 className="flex items-center gap-1.5 text-caption text-info-text hover:underline"
@@ -1022,18 +1064,14 @@ function MessageArea({ room, onOpenThread }: { room: Room; onOpenThread: (m: Mes
     <ScrollArea className="min-h-0 flex-1">
       <div className="flex flex-col gap-5 px-6 py-4">
         {room.messages.map((m) => (
-          <MessageBubble
-            key={m.id}
-            message={m}
-            isLastMine={m.id === lastMineId}
-            onOpenThread={onOpenThread}
-          />
+          <MessageBubble key={m.id} message={m} isLastMine={m.id === lastMineId} onOpenThread={onOpenThread} room={room} />
         ))}
       </div>
     </ScrollArea>
   )
 }
 
+// InputBox — no top separator on the outer container
 function InputBox() {
   const [value, setValue] = useState('')
   const ref = useRef<HTMLTextAreaElement>(null)
@@ -1048,7 +1086,7 @@ function InputBox() {
   function send() { setValue('') }
 
   return (
-    <div className="border-t border-divider bg-surface px-4 py-3 shrink-0">
+    <div className="bg-surface px-4 py-3 shrink-0">
       <div className="rounded-xl border border-border bg-canvas px-3 py-2 focus-within:border-border-hover">
         <Textarea
           ref={ref}
@@ -1058,9 +1096,7 @@ function InputBox() {
           aria-label="Type a message"
           value={value}
           onChange={(e) => setValue(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() }
-          }}
+          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
           className="!resize-none !border-0 !px-0 !py-0 max-h-40"
         />
         <div className="mt-1.5 flex items-center justify-end gap-0.5">
@@ -1070,7 +1106,7 @@ function InputBox() {
           <Separator orientation="vertical" className="mx-1 h-5" />
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="primary" size="sm" iconOnly startIcon={Send} aria-label="Send" onClick={send} disabled={!value.trim()} />
+              <Button variant="primary" size="sm" iconOnly startIcon={Send} aria-label="Send" title="" onClick={send} disabled={!value.trim()} />
             </TooltipTrigger>
             <TooltipContent>Send</TooltipContent>
           </Tooltip>
@@ -1097,7 +1133,7 @@ function ThreadInputBox() {
   }, [value])
 
   return (
-    <div className="border-t border-divider bg-surface px-3 py-2 shrink-0">
+    <div className="bg-surface px-3 py-2 shrink-0">
       <div className="rounded-xl border border-border bg-canvas px-3 py-2 focus-within:border-border-hover">
         <Textarea
           ref={ref}
@@ -1121,7 +1157,7 @@ function ThreadInputBox() {
           </label>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="primary" size="sm" iconOnly startIcon={Send} aria-label="Send reply" disabled={!value.trim()} />
+              <Button variant="primary" size="sm" iconOnly startIcon={Send} aria-label="Send reply" title="" disabled={!value.trim()} />
             </TooltipTrigger>
             <TooltipContent>Send</TooltipContent>
           </Tooltip>
@@ -1133,6 +1169,7 @@ function ThreadInputBox() {
 
 function ThreadPanel({
   message,
+  room,
   width,
   onWidthChange,
   expanded,
@@ -1141,6 +1178,7 @@ function ThreadPanel({
   onClose,
 }: {
   message: Message
+  room: Room
   width?: number
   onWidthChange: (w: number) => void
   expanded: boolean
@@ -1150,6 +1188,7 @@ function ThreadPanel({
 }) {
   const [dragging, setDragging] = useState(false)
   const author = message.author === 'me' ? ME : (PEOPLE[message.author] ?? null)
+  const mine = message.author === 'me'
 
   function startResize(e: React.PointerEvent) {
     e.preventDefault()
@@ -1157,7 +1196,6 @@ function ThreadPanel({
     const startW = width ?? 480
     setDragging(true)
     const onMove = (ev: PointerEvent) => {
-      // dragging left edge → larger width as we move left
       const delta = startX - ev.clientX
       onWidthChange(Math.max(THREAD_MIN, Math.min(THREAD_MAX, startW + delta)))
     }
@@ -1172,41 +1210,26 @@ function ThreadPanel({
 
   return (
     <div
-      className="relative flex shrink-0 flex-col border-l border-divider bg-surface"
+      className="relative flex shrink-0 flex-col border-l border-divider bg-canvas"
       style={expanded ? { flex: 1 } : { width: width ?? 480 }}
     >
-      {/* Resize handle on left edge (only when not expanded) */}
       {!expanded && (
-        <ResizeHandle
-          direction="horizontal"
-          position="start"
-          isResizing={dragging}
-          aria-label="拖曳調整 Thread 面板寬度"
-          onPointerDown={startResize}
-        />
+        <ResizeHandle direction="horizontal" position="start" isResizing={dragging} aria-label="拖曳調整 Thread 面板寬度" onPointerDown={startResize} />
       )}
 
       {/* Panel header */}
-      <div className="flex items-center border-b border-divider px-3 py-2 shrink-0">
+      <div className="flex items-center border-b border-divider bg-surface px-3 py-2 shrink-0">
         <h2 className="flex-1 font-semibold" style={{ fontSize: 15 }}>Thread</h2>
-        {/* Buttons: expand/collapse right-to-left order: expand first, then close */}
         <div className="flex items-center gap-0.5">
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button
-                variant="text"
-                size="sm"
-                iconOnly
-                startIcon={expanded ? Minimize2 : Maximize2}
-                aria-label={expanded ? 'Collapse thread' : 'Expand thread'}
-                onClick={expanded ? onCollapse : onExpand}
-              />
+              <Button variant="text" size="sm" iconOnly startIcon={expanded ? Minimize2 : Maximize2} aria-label={expanded ? 'Collapse thread' : 'Expand thread'} title="" onClick={expanded ? onCollapse : onExpand} />
             </TooltipTrigger>
             <TooltipContent>{expanded ? 'Collapse' : 'Expand'}</TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="text" size="sm" iconOnly startIcon={X} aria-label="Close thread" onClick={onClose} />
+              <Button variant="text" size="sm" iconOnly startIcon={X} aria-label="Close thread" title="" onClick={onClose} />
             </TooltipTrigger>
             <TooltipContent>Close</TooltipContent>
           </Tooltip>
@@ -1215,38 +1238,45 @@ function ThreadPanel({
 
       <ScrollArea className="min-h-0 flex-1">
         <div className="flex flex-col gap-4 px-4 py-4">
-          {/* Parent message */}
-          <div className="rounded-xl border border-divider bg-canvas p-3">
-            <div className="flex items-start gap-2">
-              {author && (
-                author === ME ? (
-                  <div className="relative inline-flex shrink-0">
-                    <Avatar src={ME.avatar} alt={ME.name} color={ME.color} size={28} />
-                  </div>
-                ) : (
-                  <PersonAvatar person={author} size={28} />
-                )
-              )}
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5 mb-1">
-                  <span style={{ fontSize: 13, fontWeight: 500 }}>
-                    {author === ME ? 'Me' : author?.name.split(' ')[0]}
-                  </span>
-                  <span style={{ fontSize: 12, color: 'var(--color-neutral-7)' }}>{message.time}</span>
+          {/* Parent message — same style as MessageBubble, no border/box */}
+          <div className={`group/msg flex flex-col ${mine ? 'items-end' : 'items-start'}`}>
+            <div className={`flex items-start gap-2 ${mine ? 'flex-row-reverse' : ''} max-w-[90%]`}>
+              {!mine && author && (
+                <div className="mt-0.5 shrink-0">
+                  {author === ME ? (
+                    <div className="relative inline-flex shrink-0">
+                      <Avatar src={ME.avatar} alt={ME.name} color={ME.color} size={32} />
+                    </div>
+                  ) : (
+                    <PersonAvatar person={author as Person} size={32} />
+                  )}
                 </div>
-                <p className="text-body whitespace-pre-wrap break-words">{message.text}</p>
+              )}
+              <div className="flex flex-col gap-0.5 min-w-0">
+                {mine && (
+                  <div className="flex justify-end pr-1">
+                    <span className="text-caption text-fg-secondary">{message.time}</span>
+                  </div>
+                )}
+                {!mine && author && (
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <span style={{ fontSize: 12, color: 'var(--color-neutral-7)', fontWeight: 500 }}>
+                      {author === ME ? 'Me' : (author as Person).name.split(' ')[0]}
+                    </span>
+                    <span style={{ fontSize: 12, color: 'var(--color-neutral-7)' }}>{message.time}</span>
+                  </div>
+                )}
+                <div
+                  className={`rounded-2xl px-3.5 py-2.5 text-body ${
+                    mine ? 'rounded-tr-sm text-foreground' : 'rounded-tl-sm bg-muted text-foreground'
+                  }`}
+                  style={mine ? { backgroundColor: '#EBEEFF' } : undefined}
+                >
+                  <p className="whitespace-pre-wrap break-words">{message.text}</p>
+                </div>
               </div>
             </div>
           </div>
-
-          {/* Thread replies placeholder */}
-          {message.replies != null && message.replies > 0 && (
-            <div className="flex items-center gap-2 px-1">
-              <Separator className="flex-1" />
-              <span className="text-caption text-fg-secondary shrink-0">{message.replies} replies</span>
-              <Separator className="flex-1" />
-            </div>
-          )}
         </div>
       </ScrollArea>
 
@@ -1262,16 +1292,19 @@ function Conversation({
   room,
   listOpen,
   onExpandList,
+  isMuted,
+  onToggleMute,
 }: {
   room: Room
   listOpen: boolean
   onExpandList: () => void
+  isMuted: boolean
+  onToggleMute: () => void
 }) {
   const [threadMessage, setThreadMessage] = useState<Message | null>(null)
   const [threadExpanded, setThreadExpanded] = useState(false)
   const [threadWidth, setThreadWidth] = useState(480)
 
-  // Reset thread when room changes
   useEffect(() => {
     setThreadMessage(null)
     setThreadExpanded(false)
@@ -1279,19 +1312,23 @@ function Conversation({
 
   return (
     <section className="flex min-w-0 flex-1 overflow-hidden bg-canvas">
-      {/* Main chat — hidden when thread is expanded */}
       {!threadExpanded && (
         <div className="flex min-w-0 flex-1 flex-col">
-          <ConversationHeader room={room} listOpen={listOpen} onExpandList={onExpandList} />
+          <ConversationHeader
+            room={room}
+            listOpen={listOpen}
+            onExpandList={onExpandList}
+            isMuted={isMuted}
+            onToggleMute={onToggleMute}
+          />
           <MessageArea room={room} onOpenThread={setThreadMessage} />
           <InputBox key={room.id} />
         </div>
       )}
-
-      {/* Thread panel */}
       {threadMessage && (
         <ThreadPanel
           message={threadMessage}
+          room={room}
           width={threadExpanded ? undefined : threadWidth}
           onWidthChange={setThreadWidth}
           expanded={threadExpanded}
@@ -1311,11 +1348,7 @@ export default function App() {
   const [listWidth, setListWidth] = useState(320)
   const [showPreview, setShowPreview] = useState(true)
   const [settingsOpen, setSettingsOpen] = useState(false)
-
-  // Mute state
   const [mutedIds, setMutedIds] = useState<Set<string>>(new Set())
-
-  // Favorite order (starts from rooms with section='favorites')
   const [favOrder, setFavOrder] = useState<string[]>(
     ROOMS.filter((r) => r.section === 'favorites').map((r) => r.id)
   )
@@ -1326,21 +1359,15 @@ export default function App() {
   function handleToggleMute(id: string) {
     setMutedIds((prev) => {
       const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
+      if (next.has(id)) next.delete(id); else next.add(id)
       return next
     })
   }
 
   function handleToggleFavorite(id: string) {
     const isFav = favOrder.includes(id)
-    if (isFav) {
-      // Unfavorite → remove from favorites (goes back to Chats)
-      setFavOrder((prev) => prev.filter((x) => x !== id))
-    } else {
-      // Favorite → append to bottom of Favorites
-      setFavOrder((prev) => [...prev, id])
-    }
+    if (isFav) setFavOrder((prev) => prev.filter((x) => x !== id))
+    else setFavOrder((prev) => [...prev, id])
   }
 
   return (
@@ -1361,9 +1388,14 @@ export default function App() {
             onToggleFavorite={handleToggleFavorite}
           />
         )}
-        <Conversation room={current} listOpen={listOpen} onExpandList={() => setListOpen(true)} />
+        <Conversation
+          room={current}
+          listOpen={listOpen}
+          onExpandList={() => setListOpen(true)}
+          isMuted={mutedIds.has(current.id)}
+          onToggleMute={() => handleToggleMute(current.id)}
+        />
       </div>
-
       <SettingsModal
         open={settingsOpen}
         onOpenChange={setSettingsOpen}
