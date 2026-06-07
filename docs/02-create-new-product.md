@@ -56,8 +56,11 @@ export default function App() {
 新 app 自動進 Storybook(`netlify.toml:14` `build.command = "npm run build-storybook"`)+ git push main → Netlify auto-rebuild → 可見於 `https://<your-netlify-site>/?path=/story/apps-<name>-...`。
 
 **Fork user 第一次 setup**:
-- `npm run setup:netlify`(1 OAuth click)auto-creates site `${ghUser}-${repoName}.netlify.app` + 印 dashboard URL 教 user 30 秒設 Basic Password(per 2026-05-29 canonical;Identity 已 deprecated)
+- `npm run setup:netlify`(1 OAuth click)auto-creates site `${ghUser}-${repoName}.netlify.app`
+- **加密碼(30 秒,免費)**:Netlify → Site configuration → Environment variables → 加 `STORYBOOK_BASIC_AUTH` = `user:password`(多組空格分隔 `"u1:p1 u2:p2"`)→ 下次 deploy 時 Edge Function `netlify/edge-functions/basic-auth.ts` 在 edge 層讀 `Authorization` header 比對此 env var,缺/錯回 401 + `WWW-Authenticate`(瀏覽器跳原生帳密彈窗)。`netlify.toml` 已 wire `[[edge_functions]]` path=`/*` function=`basic-auth`。**密碼只存 Netlify 後台 env var,不進 public repo**;未設 = 站台公開(pass-through)。Edge Function Basic Auth 是 Netlify 免費方案(含 free-tier)可用、`.netlify.app` 預設網址直接生效、無需自訂網域的 edge 層擋法(Netlify 內建密碼〔Dashboard Password Protection 與 `_headers` Basic-Auth〕都是 Pro $20/mo;`_headers` 的 basic-auth 也不套用到 edge function)
 - 之後每 push main → 自動 build + deploy + URL 進 Claude reply(`.claude/hooks/inject_deploy_url_after_push.sh`)
+
+> **要更好體驗才升級(非必須)**:Netlify Dashboard 的「Password protection / Basic protection」(Site settings → Access & security)是 **Pro 方案專屬**($20/mo)— 美化密碼頁、可只擋 deploy preview 放行 production;**free-tier 沒這開關**,按下去會被要求升 Pro。真 SSO 走 Cloudflare Access(免費 50 user,需自訂網域 + 自架 Cloudflare proxy 在 Netlify 前)。`netlify.toml` 的 `X-Robots-Tag noindex` 只防搜尋引擎索引,不擋直接訪問 → 真擋人靠上面的 `STORYBOOK_BASIC_AUTH` Edge Function Basic Auth。
 
 **Per-app standalone deploy**(`apps/<name>/dist` 獨立 site)若需要,自建 `.github/workflows/<app>-deploy.yml` + Netlify secrets。但通常不用 — template Storybook 已統一展示所有 apps,沒必要 fragment deploy。
 

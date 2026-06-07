@@ -21,9 +21,13 @@ cat <<'BANNER'
      /plugin marketplace add github:ajenchen/design-system
      /plugin install design-system@qijenchen-ds
 
-  ③ Setup Netlify(OAuth + 30 秒 dashboard 設密碼)
+  ③ Setup Netlify(OAuth)+ 設站台密碼(免費,30 秒)
      $ npm run setup:netlify
-     → 跟著 script 印的 dashboard URL 設 Basic Password
+     → Netlify 後台 Site configuration → Environment variables
+       加 STORYBOOK_BASIC_AUTH = user:password(免費 Edge Function
+       帳密,deploy 後跳瀏覽器原生帳密彈窗;免費方案即可,密碼不進 repo)
+     → 進階(非必須):升 Pro 用 dashboard Password Protection 開關
+       (美化密碼頁 / 只擋 preview),或 Cloudflare Access 真 SSO
 
 之後寫 code:
   $ npm run create-app <kebab-name>   # 開新 product app

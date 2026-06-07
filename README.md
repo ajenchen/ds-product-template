@@ -46,14 +46,18 @@ npm run dev                          # localhost vite 啟動
 
 Storybook root config `.storybook/main.ts` 自動 glob `apps/**/*.stories.tsx`,**每加新 app stories 自動現身 storybook**,不用手動 register。
 
-### Step 5 — Setup Netlify(自動 site + 手動 password,3 分鐘)
+### Step 5 — Setup Netlify(自動 site + 免費密碼,3 分鐘)
 
 ```bash
 npm run setup:netlify   # 自動:CLI install + GitHub OAuth login + site 建 + 連 repo
-                        # 最後印 dashboard URL + 教你 30 秒設 Basic Password
+                        # 最後印 dashboard URL + 教你 30 秒設 STORYBOOK_BASIC_AUTH env var
 ```
 
-**為何 Basic Password?** Identity(原本 invite-only 機制)2024 起 Netlify 已 deprecated,新帳號可能根本看不到 Identity menu;Team protection 鎖 Pro plan($19/mo)。**Basic Password 是 free-tier 唯一真擋陌生人的方法**(設一組共用 password,分享給 stakeholder)。
+**為何要密碼?** Storybook 含內部 product UI,Netlify deploy 預設公開,要擋陌生人。**免費做法 = Netlify Edge Function 自做 HTTP Basic Auth**(Edge Functions 免費方案可用、`.netlify.app` 預設網址直接生效、無需自訂網域,瀏覽器原生帳密彈窗)。本 template 已內建:`netlify/edge-functions/basic-auth.ts` 讀 Authorization header、比對 Netlify env var `STORYBOOK_BASIC_AUTH`(格式 `user:password`,多組空格分隔),缺/錯回 401 + WWW-Authenticate;`netlify.toml` 已 wire `[[edge_functions]]` path="/*";未設 env var = 站台公開(pass-through)。
+
+> Netlify 內建密碼 —— Dashboard 的「Password protection / Basic protection」(Site settings → Access & security)**與** `_headers` 的 Basic-Auth header —— **兩個都是 Pro 方案專屬**($20/mo,官方 docs + support forum 證實;且 `_headers` basic-auth 不套用到 edge function),free-tier 都沒有——所以免費路徑走上面的 edge function,不走 dashboard、也不靠 `_headers`。
+
+**fork user 設定(30 秒,免費)**:Netlify → Site configuration → Environment variables → 加 `STORYBOOK_BASIC_AUTH` = `user:password` → 下次 deploy(push main / Trigger deploy)站台自動跳帳密彈窗。密碼只存 Netlify 後台 env var,**不進 public repo**。
 
 ### Step 6 — Push main → 自動部署
 
@@ -108,6 +112,10 @@ ds-product-template/
 ├── .claude/
 │   └── settings.json           ← Claude Code config (plugin marketplace flow)
 ├── .storybook/                 ← Shared Storybook config (imports @qijenchen/storybook-config)
+├── netlify/
+│   └── edge-functions/
+│       └── basic-auth.ts       ← FREE HTTP Basic Auth (reads STORYBOOK_BASIC_AUTH env var)
+├── netlify.toml                ← build storybook-static + wire edge function + SEO headers
 ├── .github/
 │   ├── CODEOWNERS              ← Code review routing
 │   └── workflows/
@@ -150,7 +158,7 @@ claude                                                         # ① 啟動 Clau
 # 內輸: /plugin marketplace add github:ajenchen/design-system    # ② 拿 DS 治理 plugin
 # 內輸: /plugin install design-system@qijenchen-ds                #    啟用 22 skills + 59 hooks
 npm run setup:netlify                                          # ③ Netlify OAuth + 印 dashboard URL
-# 開瀏覽器點 Visitor access → Basic protection → 輸 password → Save
+# Netlify Dashboard → Environment variables → 加 STORYBOOK_BASIC_AUTH=user:password(免費上密碼)
 ```
 
 Deploy URL 在 push 後 hook `inject_deploy_url_after_push.sh` 自動 inject 進 Claude reply(`https://<branch>--<owner>-<repo>.netlify.app` 推導 + curl 200 verify + Storybook content sniff)。
@@ -162,26 +170,27 @@ Deploy URL 在 push 後 hook `inject_deploy_url_after_push.sh` 自動 inject 進
 2. Netlify 自動讀根目錄 `netlify.toml` → build `storybook-static` → deploy
 3. 每次 push main → Netlify auto rebuild。Per-branch preview 自動啟用。
 
-**Step 2 — 🔒 設 Basic Password Protection**(free-tier 唯一可用 access control):
+**Step 2 — 🔒 設 STORYBOOK_BASIC_AUTH 上密碼**(免費,Edge Functions 免費方案可用):
 
-`npm run setup:netlify` 自動跑完 CLI install + login + site 建 + 連 repo,**最後印 dashboard 連結 + 30 秒 password 設定指引**。
+免費的 access control = **Netlify Edge Function 自做 HTTP Basic Auth**(edge 層擋,瀏覽器原生帳密彈窗)。本 template 已內建:`netlify/edge-functions/basic-auth.ts` 讀 Authorization header、比對 Netlify env var `STORYBOOK_BASIC_AUTH`,缺/錯回 401;`netlify.toml` 已 wire `[[edge_functions]]` path="/*"。fork user 設定 30 秒:
 
-跟著 script 印的步驟手動 dashboard 設:
-1. 打開 `https://app.netlify.com/projects/<your-site>/configuration/visitor-access`
-2. **Password Protection** → 選「**Basic protection**」→ 輸 password → **Save**
-3. 把 site URL + password 私訊給 stakeholder(team Slack / DM)
+1. Netlify → **Site configuration → Environment variables → Add a variable**
+2. Key = `STORYBOOK_BASIC_AUTH`,Value = `user:password`(多組帳密空格分隔:`alice:pw1 bob:pw2`)
+3. 下次 deploy(push main / Trigger deploy)→ 站台自動跳帳密彈窗。把 site URL + 帳密私訊 stakeholder(team Slack / DM)
 
-**為何只用 Basic Password?**(誠實版,2026-05-29 確認):
-- ❌ **Identity** = 2024 起 Netlify 公告 deprecated;新帳號可能看不到 Identity menu。原本「invite-only per-user」路徑**不再可用**
-- ❌ **Team protection 🔒** = 鎖,要 Pro plan $19/mo(fork user 不該被迫付費)
-- ❌ **Non-production deploys only 🔒** = 同上鎖
-- ✅ **Basic Password** = free-tier 唯一真擋陌生人的方法(設共用 password,分享 team)
+> 密碼只存 Netlify 後台 env var,**不進 public repo**(public repo 不能 commit 明文帳密);未設 env var = 站台公開(pass-through)。
 
-**Defense-in-depth**(`netlify.toml` 已 ship):X-Robots-Tag noindex(搜尋引擎不收錄 URL)+ Referrer strict-origin + X-Frame SAMEORIGIN — SEO 層加固,**真實擋人**靠 Basic Password 那一層。
+**為何不走 Dashboard 的 Password Protection?**(2026-06-05 官方 docs + support forum 三重證實):
+- ❌ **Dashboard「Password protection / Basic protection」**(Site settings → Access & security)= **Pro 方案專屬**($20/mo);free-tier 沒這個開關,按下去會被要求升級付費(這就是 fork user 卡住的原因)
+- ❌ **`_headers` 的 Basic-Auth header** = 同樣 **Pro 方案專屬**($20/mo);且官方限制頁載明 `_headers` basic-auth **不會套用到 edge function**——免費寫進 `_headers` 不會生效,別再用
+- ❌ **Identity** = 2024 起 Netlify 公告 deprecated;新帳號可能看不到 Identity menu
+- ✅ **`STORYBOOK_BASIC_AUTH` env var → Edge Function `netlify/edge-functions/basic-auth.ts`** = 免費(Edge Functions 免費方案可用)、`.netlify.app` 預設網址直接生效、無需自訂網域,本 template 已內建
 
-**要更細權限**?三條路:
-- 升 **Netlify Pro** $19/mo → 解鎖 Team protection(per-account login + audit log)
-- 自架 **Cloudflare Access**(免費 50 user;setup 比 Netlify 複雜)
+**Defense-in-depth**(`netlify.toml` 已 ship):X-Robots-Tag noindex(搜尋引擎不收錄 URL)+ Referrer strict-origin + X-Frame SAMEORIGIN — 只防 SEO 索引,不擋直接訪問;**真實擋人**靠上面的 `STORYBOOK_BASIC_AUTH` Edge Function Basic Auth 那一層。
+
+**要更好體驗才升級**(非必須):
+- 升 **Netlify Pro** $20/mo → Dashboard Password Protection(美化密碼頁、可只擋 deploy preview 放行 production、團隊登入)
+- 自架 **Cloudflare Access**(免費 50 user 真 SSO;需在 Netlify 前架 Cloudflare proxy,setup 較複雜)
 - 公開 site,只防 SEO(`X-Robots-Tag noindex`)— 若 stakeholder 不介意 URL 知道就能看
 
 ### Workflow 機制總覽

@@ -2,6 +2,12 @@
 // (per `.claude/rules/story-rules.md`「Production-grade composition fidelity」+ M23(d) nearest-same-purpose canonical wins)
 //
 // @story-baseline: @qijenchen/design-system/components/Sidebar/sidebar.stories.tsx#IconCollapse
+// (2026-06-02 conformance-model:@story-baseline = consume canonical 結構的意圖,由靜態 conformance hook 驗
+//  〔check_consumer_ds_primitive_misuse〔含 Pattern 8〕/ check_layout_space_magic_numbers / check_story_invariants
+//  R7+R8〕。舊的 shell-only 視覺 identity-diff 標記已移除(此範本品牌 Acme Product / nav / 內容 by-design
+//  異於 DS demo Acme Inc / MAIN_NAV,連 shell 文字都不同,pixel/DOM identity 即使遮罩內容也必 false-positive,
+//  per composition-fidelity.md「禁拿產品範本 pixel 比 showcase」)。注意:此註解刻意不寫可被 diff script regex
+//  解析的標記字面,以免「解釋移除」反而把標記種回去。)
 //
 // SSOT 鐵律:
 //   - Consumer 只 import `@qijenchen/design-system` public exports
