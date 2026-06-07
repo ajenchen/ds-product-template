@@ -46,6 +46,9 @@ jobs:
           # (fork 卡 ^beta.36 而 lockfile 已 beta.38)。改 explicit `npm install @pkg@version --save` 把 spec 同步寫進
           # package.json,用 dispatch payload version(release.yml 帶);無 payload 時 fallback @beta dist-tag。
           VERSION="${{ github.event.client_payload.version }}"
+          # 2026-06-07 fix:design-system-published dispatch 送 `github.ref_name`=`v0.1.0-beta.NN`(帶 v);
+          # npm range `^v0.1.0-beta.NN` 非法 → install 炸。剝掉開頭 v,兼容兩種 dispatch 格式(robust at consumer)。
+          VERSION="${VERSION#v}"
           if [ -n "$VERSION" ]; then
             npm install "@qijenchen/design-system@^${VERSION}" "@qijenchen/storybook-config@^${VERSION}" --save --legacy-peer-deps
           else
@@ -101,7 +104,14 @@ jobs:
           git config user.email 'noreply@qijenchen.dev'
           git add -A
           git commit -m "chore(sync): auto-bump @qijenchen/* to latest @beta(from DS release dispatch)"
-          # 2026-06-07 C3 fix:推前先 rebase(autostash),萬一仍有並發(workflow_dispatch + dispatch 重疊)也不 fail。
-          git pull --rebase --autostash 2>/dev/null || true
-          git push
-          echo "✓ pushed auto-sync commit"
+          # 2026-06-07 fix:concurrency group 序列化「本 workflow 自己的」run,但 DS repo 的 mirror workflow 也推
+          # published main → 仍可能競態。fetch-rebase-retry 迴圈:被搶先乾淨疊上;真衝突 abort 重試;5 次仍失敗 FAIL
+          # (不再 `|| true` 吞掉衝突 → 推 broken tree / 丟 bump)。
+          for i in 1 2 3 4 5; do
+            if git fetch origin main -q && git rebase origin/main -q && git push; then
+              echo "✓ pushed auto-sync commit"; break
+            fi
+            git rebase --abort 2>/dev/null || true
+            if [ "$i" -eq 5 ]; then echo "❌ push 競態重試 5 次仍失敗"; exit 1; fi
+            echo "⏳ push 競態,重試 $i…"; sleep $((i * 3))
+          done
