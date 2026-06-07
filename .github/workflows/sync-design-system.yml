@@ -10,8 +10,14 @@ name: Sync Design System
 
 on:
   repository_dispatch:
-    types: [design-system-published, ds-ssot-changed]
+    types: [design-system-published, ds-published, ds-ssot-changed]
   workflow_dispatch:
+
+# 2026-06-07 C3 fix:同一 DS release 會同時 dispatch design-system-published / ds-published / ds-ssot-changed
+# → 多個並發 run 互推 main 造成 race / non-fast-forward / 丟更新。concurrency group serialize(不取消、排隊跑)。
+concurrency:
+  group: ds-product-template-sync
+  cancel-in-progress: false
 
 jobs:
   sync:
@@ -36,8 +42,15 @@ jobs:
       - name: Update @qijenchen/* to latest @beta
         run: |
           npm install --legacy-peer-deps
-          npm update @qijenchen/design-system @qijenchen/storybook-config --legacy-peer-deps
-          # ensure beta tag(npm update 可能拉 latest dist-tag,但兩者本是同版)
+          # 2026-05-30 codex Phase B P2 fix:`npm update` 只更新 lockfile 不改寫 package.json spec → spec drift
+          # (fork 卡 ^beta.36 而 lockfile 已 beta.38)。改 explicit `npm install @pkg@version --save` 把 spec 同步寫進
+          # package.json,用 dispatch payload version(release.yml 帶);無 payload 時 fallback @beta dist-tag。
+          VERSION="${{ github.event.client_payload.version }}"
+          if [ -n "$VERSION" ]; then
+            npm install "@qijenchen/design-system@^${VERSION}" "@qijenchen/storybook-config@^${VERSION}" --save --legacy-peer-deps
+          else
+            npm install "@qijenchen/design-system@beta" "@qijenchen/storybook-config@beta" --save --legacy-peer-deps
+          fi
           echo "---"
           npm ls @qijenchen/design-system @qijenchen/storybook-config 2>&1 | head -5
 
@@ -88,5 +101,7 @@ jobs:
           git config user.email 'noreply@qijenchen.dev'
           git add -A
           git commit -m "chore(sync): auto-bump @qijenchen/* to latest @beta(from DS release dispatch)"
+          # 2026-06-07 C3 fix:推前先 rebase(autostash),萬一仍有並發(workflow_dispatch + dispatch 重疊)也不 fail。
+          git pull --rebase --autostash 2>/dev/null || true
           git push
           echo "✓ pushed auto-sync commit"
