@@ -747,15 +747,19 @@ function RoomInfoButton({ count }: { count: number }) {
   )
 }
 
-// Header more menu — mute/unmute aware
+// Header more menu — mute/unmute + full-width toggle aware
 function HeaderMoreMenu({
   type,
   isMuted,
   onToggleMute,
+  isFullWidth,
+  onToggleFullWidth,
 }: {
   type: 'dm' | 'general'
   isMuted: boolean
   onToggleMute: () => void
+  isFullWidth: boolean
+  onToggleFullWidth: () => void
 }) {
   return (
     <DropdownMenu>
@@ -774,7 +778,21 @@ function HeaderMoreMenu({
             <DropdownMenuSeparator />
           </>
         )}
-        <DropdownMenuItem startIcon={Maximize2}>Full width</DropdownMenuItem>
+        {/* Full width — inline Switch toggle; onSelect prevents menu close on click */}
+        <DropdownMenuItem
+          startIcon={Maximize2}
+          onSelect={(e) => { e.preventDefault(); onToggleFullWidth() }}
+        >
+          <span className="flex flex-1 items-center justify-between gap-6">
+            Full width
+            <Switch
+              checked={isFullWidth}
+              onCheckedChange={onToggleFullWidth}
+              aria-label="Full width"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </span>
+        </DropdownMenuItem>
         <DropdownMenuItem startIcon={isMuted ? Bell : BellOff} onSelect={onToggleMute}>
           {isMuted ? 'Unmute' : 'Mute'}
         </DropdownMenuItem>
@@ -797,12 +815,16 @@ function ConversationHeader({
   onExpandList,
   isMuted,
   onToggleMute,
+  isFullWidth,
+  onToggleFullWidth,
 }: {
   room: Room
   listOpen: boolean
   onExpandList: () => void
   isMuted: boolean
   onToggleMute: () => void
+  isFullWidth: boolean
+  onToggleFullWidth: () => void
 }) {
   const memberCount = room.memberKeys?.length ?? 0
 
@@ -849,7 +871,7 @@ function ConversationHeader({
           </TooltipTrigger>
           <TooltipContent>Search</TooltipContent>
         </Tooltip>
-        <HeaderMoreMenu type={room.type} isMuted={isMuted} onToggleMute={onToggleMute} />
+        <HeaderMoreMenu type={room.type} isMuted={isMuted} onToggleMute={onToggleMute} isFullWidth={isFullWidth} onToggleFullWidth={onToggleFullWidth} />
       </div>
     </header>
   )
@@ -1050,13 +1072,17 @@ function MessageBubble({
   )
 }
 
-function MessageArea({ room, onOpenThread }: { room: Room; onOpenThread: (m: Message) => void }) {
+function MessageArea({ room, onOpenThread, fullWidth }: { room: Room; onOpenThread: (m: Message) => void; fullWidth: boolean }) {
   const lastMineId = [...room.messages].reverse().find((m) => m.author === 'me')?.id ?? null
   return (
     <ScrollArea className="min-h-0 flex-1">
-      {/* px-6 py-4 on outer — content capped at 680px and centered; padding shows naturally when wider */}
-      <div className="px-6 py-4">
-        <div className="mx-auto flex flex-col gap-5" style={{ maxWidth: 680 }}>
+      {/* fullWidth=true → no max-width constraint, 16px padding each side
+          fullWidth=false → capped at 960px, centered, px-6 outer padding */}
+      <div className={fullWidth ? 'px-4 py-4' : 'px-6 py-4'}>
+        <div
+          className="mx-auto flex flex-col gap-5"
+          style={fullWidth ? undefined : { maxWidth: 960 }}
+        >
           {room.messages.map((m) => (
             <MessageBubble key={m.id} message={m} isLastMine={m.id === lastMineId} onOpenThread={onOpenThread} room={room} />
           ))}
@@ -1289,12 +1315,16 @@ function Conversation({
   onExpandList,
   isMuted,
   onToggleMute,
+  fullWidth,
+  onToggleFullWidth,
 }: {
   room: Room
   listOpen: boolean
   onExpandList: () => void
   isMuted: boolean
   onToggleMute: () => void
+  fullWidth: boolean
+  onToggleFullWidth: () => void
 }) {
   const [threadMessage, setThreadMessage] = useState<Message | null>(null)
   const [threadExpanded, setThreadExpanded] = useState(false)
@@ -1315,8 +1345,10 @@ function Conversation({
             onExpandList={onExpandList}
             isMuted={isMuted}
             onToggleMute={onToggleMute}
+            isFullWidth={fullWidth}
+            onToggleFullWidth={onToggleFullWidth}
           />
-          <MessageArea room={room} onOpenThread={setThreadMessage} />
+          <MessageArea room={room} onOpenThread={setThreadMessage} fullWidth={fullWidth} />
           <InputBox key={room.id} />
         </div>
       )}
@@ -1344,6 +1376,9 @@ export default function App() {
   const [showPreview, setShowPreview] = useState(true)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [mutedIds, setMutedIds] = useState<Set<string>>(new Set())
+  // fullWidth=true (default): no max-width constraint, 16px padding
+  // fullWidth=false: capped at 960px, centered
+  const [fullWidth, setFullWidth] = useState(true)
   const [favOrder, setFavOrder] = useState<string[]>(
     ROOMS.filter((r) => r.section === 'favorites').map((r) => r.id)
   )
@@ -1387,6 +1422,8 @@ export default function App() {
           room={current}
           listOpen={listOpen}
           onExpandList={() => setListOpen(true)}
+          fullWidth={fullWidth}
+          onToggleFullWidth={() => setFullWidth((v) => !v)}
           isMuted={mutedIds.has(current.id)}
           onToggleMute={() => handleToggleMute(current.id)}
         />
