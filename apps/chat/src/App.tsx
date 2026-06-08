@@ -352,8 +352,8 @@ function SettingsModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl p-0 overflow-hidden">
-        <div className="flex h-[480px]">
+      <DialogContent className="max-w-2xl h-[480px] p-0 overflow-hidden">
+        <div className="flex h-full min-h-0">
           <nav className="flex w-44 shrink-0 flex-col gap-0.5 border-r border-divider bg-surface p-3">
             <p className="px-2 pb-1 pt-0.5 text-caption font-semibold uppercase tracking-wide text-fg-secondary">Settings</p>
             <button type="button" className="flex w-full items-center gap-2 rounded-md bg-neutral-selected px-2 py-1.5 text-left text-body font-medium text-foreground">
@@ -361,7 +361,7 @@ function SettingsModal({
               Chats
             </button>
           </nav>
-          <div className="flex min-w-0 flex-1 flex-col">
+          <div className="flex min-w-0 min-h-0 flex-1 flex-col">
             <DialogHeader className="border-b border-divider px-6 py-4">
               <DialogTitle>Chats list</DialogTitle>
             </DialogHeader>
@@ -513,8 +513,8 @@ function RoomMoreMenu({
         </TooltipTrigger>
         <TooltipContent>More</TooltipContent>
       </Tooltip>
-      {/* align="start" side="bottom" sideOffset=8 — dropdown appears below trigger, left-aligned, 8px gap */}
-      <DropdownMenuContent align="end" side="bottom" sideOffset={8}>
+      {/* side="bottom" sideOffset=8 avoidCollisions=false — dropdown always below trigger with 8px gap */}
+      <DropdownMenuContent align="end" side="bottom" sideOffset={8} avoidCollisions={false}>
         <DropdownMenuItem startIcon={isMuted ? Bell : BellOff} onSelect={onToggleMute}>
           {isMuted ? 'Unmute' : 'Mute'}
         </DropdownMenuItem>
