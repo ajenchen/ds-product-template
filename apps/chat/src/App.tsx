@@ -612,8 +612,8 @@ function RoomRow({
         </span>
       )}
 
-      {/* Hover: more button overlays the right-side items */}
-      <div className="absolute right-2 hidden group-hover:block [&:has([data-state=open])]:block" onClick={(e) => e.stopPropagation()}>
+      {/* Hover: more button — stays in flex flow (no absolute) so Radix can anchor the dropdown correctly */}
+      <div className="shrink-0 invisible group-hover:visible [&:has([data-state=open])]:visible" onClick={(e) => e.stopPropagation()}>
         <RoomMoreMenu
           room={room}
           isMuted={isMuted}

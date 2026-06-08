@@ -70,7 +70,7 @@ ChatList
 - `RoomRow`：兩行預覽（名稱 + 最後訊息）。右側 time + 未讀 badge 用 `shrink-0` 防止 resize 時裁切。
 - `RoomMoreMenu`：more 選單 → Mute/Unmute · Favorite/Unfavorite · Open in new tab · Open in new window · Leave。
   - 選單出現在 more 按鈕**下方 8px**（`side="bottom" sideOffset={8}`）；保留 Radix 預設碰撞避讓，靠近視窗邊緣時自動翻上方以維持可見。
-  - 外層 wrapper 用 `[&:has([data-state=open])]:block`，選單開啟時 more 按鈕保持顯示，避免滑鼠移開後選單秒關。
+  - 外層 wrapper 用 `shrink-0 invisible group-hover:visible [&:has([data-state=open])]:visible`（**不用 absolute**，留在 flex flow 內讓 Radix 正確計算錨點）；選單開啟時 more 按鈕保持顯示，避免滑鼠移開後選單秒關。
 
 ---
 
