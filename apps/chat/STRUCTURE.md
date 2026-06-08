@@ -4,6 +4,10 @@
 
 > 消費 `@qijenchen/design-system`（public surface only）。詳見 repo 根目錄 `CLAUDE.md`。
 
+> **維護慣例（user 約定，務必遵守）**：
+> 1. 任何對 `apps/chat/src/App.tsx` 的改動，**必須同步更新本文件**，使結構描述與程式碼一致。
+> 2. 每次改動完成後，**主動提供完整 PR 步驟**（bundle 指令 + compare 連結 + 標題/說明），user 不需另外要求。
+
 ---
 
 ## 整體佈局
@@ -65,7 +69,8 @@ ChatList
 
 - `RoomRow`：兩行預覽（名稱 + 最後訊息）。右側 time + 未讀 badge 用 `shrink-0` 防止 resize 時裁切。
 - `RoomMoreMenu`：more 選單 → Mute/Unmute · Favorite/Unfavorite · Open in new tab · Open in new window · Leave。
-  - 選單固定在 more 按鈕**下方 8px**（`side="bottom" sideOffset={8} avoidCollisions={false}`）。
+  - 選單出現在 more 按鈕**下方 8px**（`side="bottom" sideOffset={8}`）；保留 Radix 預設碰撞避讓，靠近視窗邊緣時自動翻上方以維持可見。
+  - 外層 wrapper 用 `[&:has([data-state=open])]:block`，選單開啟時 more 按鈕保持顯示，避免滑鼠移開後選單秒關。
 
 ---
 
