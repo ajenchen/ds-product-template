@@ -513,8 +513,8 @@ function RoomMoreMenu({
         </TooltipTrigger>
         <TooltipContent>More</TooltipContent>
       </Tooltip>
-      {/* side="bottom" sideOffset=8 avoidCollisions=false — dropdown always below trigger with 8px gap */}
-      <DropdownMenuContent align="end" side="bottom" sideOffset={8} avoidCollisions={false}>
+      {/* side="bottom" sideOffset=8 — dropdown below trigger with 8px gap; collision avoidance keeps it on-screen near viewport edges */}
+      <DropdownMenuContent align="end" side="bottom" sideOffset={8}>
         <DropdownMenuItem startIcon={isMuted ? Bell : BellOff} onSelect={onToggleMute}>
           {isMuted ? 'Unmute' : 'Mute'}
         </DropdownMenuItem>
@@ -613,7 +613,7 @@ function RoomRow({
       )}
 
       {/* Hover: more button overlays the right-side items */}
-      <div className="absolute right-2 hidden group-hover:block" onClick={(e) => e.stopPropagation()}>
+      <div className="absolute right-2 hidden group-hover:block [&:has([data-state=open])]:block" onClick={(e) => e.stopPropagation()}>
         <RoomMoreMenu
           room={room}
           isMuted={isMuted}
