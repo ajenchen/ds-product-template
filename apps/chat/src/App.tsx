@@ -946,7 +946,7 @@ function ReactionMoreMenu({
 
 function ReactionBar({ onOpenThread, mine, room }: { onOpenThread: () => void; mine: boolean; room: Room }) {
   return (
-    <div className="absolute -top-4 right-2 z-10 hidden items-center gap-0.5 rounded-lg border border-divider bg-surface-raised p-0.5 shadow-md group-hover/msg:flex">
+    <div className="absolute -top-4 right-2 z-10 flex items-center gap-0.5 rounded-lg border border-divider bg-surface-raised p-0.5 shadow-md invisible group-hover/msg:visible [&:has([data-state=open])]:visible">
       {COMMON_EMOJI.map((e) => (
         <Tooltip key={e}>
           <TooltipTrigger asChild>

@@ -72,6 +72,7 @@ ChatList
   - 選單出現在 more 按鈕**下方 8px**（`side="bottom" sideOffset={8}`）；保留 Radix 預設碰撞避讓，靠近視窗邊緣時自動翻上方以維持可見。
   - more 按鈕為 **24×24px**（`!h-6 !w-6 !p-0`），外層 `absolute right-1 top-1/2 -translate-y-1/2`，框右緣距分隔線 **12px**（icon 視覺右緣落在 16px，與 date/time 右緣重疊）。用 **`invisible` 而非 `hidden`**（保留可量測 box，讓 Radix 正確錨定 dropdown）；`group-hover:visible` + `[&:has([data-state=open])]:visible` → hover 才出現、選單開啟時保持顯示。
 - **間距**：列表外層 `px-2` + row `px-2` → date/time & badge 右緣距右側分隔線 **16px**；hover 時 date/time + badge 用 `group-hover:invisible` 隱藏，由 more 按鈕覆蓋。
+- **ReactionBar**：用 `invisible/visible`（非 `hidden/flex`）控制顯隱，確保 Radix trigger 保留 box、選單開啟時 bar 不消失。
 
 ---
 
@@ -91,7 +92,7 @@ Conversation
 │       ├── 我的: bg #EBEEFF、時間在上、status icon 在泡泡外
 │       ├── 對方: 頭像 + 名稱 + 時間 (12px neutral-7)
 │       ├── ReactionBar
-│       └── ReactionMoreMenu  (mine vs other 不同選單)
+│       └── ReactionMoreMenu  (mine vs other 不同選單；`side="bottom" sideOffset={8}`，保留 Radix 碰撞避讓)
 ├── InputBox                  (無頂部分隔線)
 └── ThreadPanel               寬 320~720，可拉寬
     ├── 父訊息 + 回覆串
