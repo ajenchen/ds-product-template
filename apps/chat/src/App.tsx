@@ -749,7 +749,7 @@ function ChatList({
         </div>
       </ScrollArea>
 
-      <ResizeHandle direction="horizontal" position="end" isResizing={dragging} aria-label="拖曳調整聊天列表寬度" onPointerDown={startResize} />
+      <ResizeHandle direction="horizontal" position="end" isResizing={dragging} aria-label="拖曳調整聊天列表寬度" onPointerDown={startResize} className="[&>span]:!bg-[var(--color-neutral-4)]" />
     </aside>
   )
 }
@@ -1090,8 +1090,13 @@ function MessageBubble({
                         <span style={{ color: 'var(--color-neutral-8)' }}>{r.count}</span>
                       </button>
                     ))}
-                    <button type="button" aria-label="Add reaction" className="flex h-6 items-center rounded-full bg-surface px-1.5 py-1 text-fg-secondary hover:text-foreground">
-                      <SmilePlus size={14} />
+                    <button
+                      type="button"
+                      aria-label="Add reaction"
+                      className="flex h-6 items-center rounded-full border bg-surface px-2 py-1 text-fg-secondary hover:bg-neutral-hover hover:text-foreground"
+                      style={{ borderColor: 'var(--color-neutral-5)' }}
+                    >
+                      <SmilePlus size={16} />
                     </button>
                   </div>
                 )}
@@ -1104,8 +1109,8 @@ function MessageBubble({
             <div className={`mt-0.5 flex items-center gap-1 ${mine ? 'justify-end' : ''}`}>
               {!mine && (
                 <div
-                  className="shrink-0 border-l-2 border-b-2 border-neutral-300 rounded-bl"
-                  style={{ width: 24, height: 24 }}
+                  className="shrink-0 border-l border-b rounded-bl-[10px]"
+                  style={{ width: 24, height: 24, borderColor: 'var(--color-neutral-4)' }}
                 />
               )}
               <button
@@ -1293,7 +1298,7 @@ function ThreadPanel({
       style={expanded ? { flex: 1 } : { width: width ?? 480 }}
     >
       {!expanded && (
-        <ResizeHandle direction="horizontal" position="start" isResizing={dragging} aria-label="拖曳調整 Thread 面板寬度" onPointerDown={startResize} />
+        <ResizeHandle direction="horizontal" position="start" isResizing={dragging} aria-label="拖曳調整 Thread 面板寬度" onPointerDown={startResize} className="[&>span]:!bg-[var(--color-neutral-4)]" />
       )}
 
       {/* Panel header */}
@@ -1328,11 +1333,6 @@ function ThreadPanel({
           {/* Thread replies */}
           {message.threadMessages && message.threadMessages.length > 0 && (
             <>
-              <div className="flex items-center gap-2">
-                <Separator className="flex-1" />
-                <span className="shrink-0 text-caption text-fg-secondary">{message.threadMessages.length} {message.threadMessages.length === 1 ? 'reply' : 'replies'}</span>
-                <Separator className="flex-1" />
-              </div>
               {(() => {
                 const threadMsgs = message.threadMessages!
                 const lastMineId = [...threadMsgs].reverse().find((m) => m.author === 'me')?.id ?? null
