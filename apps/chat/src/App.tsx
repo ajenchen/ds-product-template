@@ -1071,8 +1071,8 @@ function MessageBubble({
             <div className="relative min-w-0">
               <ReactionBar onOpenThread={() => onOpenThread(message)} mine={mine} room={room} hideReplyInThread={isInThread} />
               <div
-                className={`rounded-2xl p-3 text-body ${
-                  mine ? 'rounded-tr-sm text-foreground' : 'rounded-tl-sm bg-muted text-foreground'
+                className={`rounded-xl p-3 text-body ${
+                  mine ? 'text-foreground' : 'bg-muted text-foreground'
                 }`}
                 style={mine ? { backgroundColor: '#EBEEFF' } : undefined}
               >
@@ -1108,10 +1108,10 @@ function MessageBubble({
           {!isInThread && replyCount > 0 && (
             <div className={`mt-0.5 flex items-center gap-1 ${mine ? 'justify-end' : ''}`}>
               {!mine && (
-                <div className="relative shrink-0" style={{ width: 24, height: 24 }}>
-                  <div className="absolute w-px bg-[var(--color-neutral-4)]" style={{ left: 10, top: 0, height: 12 }} />
-                  <div className="absolute h-px bg-[var(--color-neutral-4)]" style={{ left: 10, top: 12, right: 0 }} />
-                </div>
+                <div
+                  className="shrink-0 border-l border-b rounded-bl-[8px]"
+                  style={{ width: 24, height: 12, borderColor: 'var(--color-neutral-4)' }}
+                />
               )}
               <button
                 type="button"
@@ -1167,8 +1167,8 @@ function InputBox({ fullWidth }: { fullWidth: boolean }) {
   function send() { setValue('') }
 
   return (
-    <div className={fullWidth ? 'bg-surface px-4 py-3 shrink-0' : 'bg-surface px-6 py-3 shrink-0'}>
-      {/* fullWidth=true → no max-width, 16px side padding; fullWidth=false → max 880px, centered */}
+    <div className="bg-surface px-4 py-3 shrink-0">
+      {/* side padding 16px; fullWidth=false → max 880px, centered */}
       <div className="mx-auto" style={fullWidth ? undefined : { maxWidth: 880 }}>
       <div className="rounded-xl border border-border bg-canvas px-3 py-2 focus-within:border-border-hover">
         <Textarea
