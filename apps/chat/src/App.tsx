@@ -698,7 +698,9 @@ function ChatList({
         </div>
       </header>
 
-      <ScrollArea className="min-h-0 flex-1">
+      {/* [&_[data-radix-scroll-area-viewport]>div]:!block — override Radix's inner display:table wrapper
+          so rows are constrained to the aside width and truncate instead of overflowing past the divider */}
+      <ScrollArea className="min-h-0 flex-1 [&_[data-radix-scroll-area-viewport]>div]:!block">
         {/* px-2 container + row's px-2 → date/time & badge sit 16px from the right divider */}
         <div className="px-2 pb-3">
           <Section label="Favorites" open={openFav} onToggle={() => setOpenFav((v) => !v)} />
