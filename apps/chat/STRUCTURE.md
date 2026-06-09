@@ -95,7 +95,7 @@ Conversation
 │       ├── 對方: 頭像 + 名稱 + 時間 (12px neutral-7)
 │       ├── ReactionBar
 │       └── ReactionMoreMenu  (mine vs other 不同選單；`side="bottom" sideOffset={8}`，保留 Radix 碰撞避讓)
-├── InputBox                  (無頂部分隔線)
+├── InputBox                  (無頂部分隔線；接受 `fullWidth` prop。ON=全寬；OFF=max 880px 置中)
 └── ThreadPanel               寬 320~720，可拉寬
     ├── 父訊息 + 回覆串
     └── ThreadInputBox        含 "Also send to chatroom" checkbox

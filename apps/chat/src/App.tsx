@@ -1105,7 +1105,7 @@ function MessageArea({ room, onOpenThread, fullWidth }: { room: Room; onOpenThre
 }
 
 // InputBox — no top separator on the outer container
-function InputBox() {
+function InputBox({ fullWidth }: { fullWidth: boolean }) {
   const [value, setValue] = useState('')
   const ref = useRef<HTMLTextAreaElement>(null)
 
@@ -1119,7 +1119,9 @@ function InputBox() {
   function send() { setValue('') }
 
   return (
-    <div className="bg-surface px-4 py-3 shrink-0">
+    <div className={fullWidth ? 'bg-surface px-4 py-3 shrink-0' : 'bg-surface px-6 py-3 shrink-0'}>
+      {/* fullWidth=true → no max-width, 16px side padding; fullWidth=false → max 880px, centered */}
+      <div className="mx-auto" style={fullWidth ? undefined : { maxWidth: 880 }}>
       <div className="rounded-xl border border-border bg-canvas px-3 py-2 focus-within:border-border-hover">
         <Textarea
           ref={ref}
@@ -1144,6 +1146,7 @@ function InputBox() {
             <TooltipContent>Send</TooltipContent>
           </Tooltip>
         </div>
+      </div>
       </div>
     </div>
   )
@@ -1361,7 +1364,7 @@ function Conversation({
             onToggleFullWidth={onToggleFullWidth}
           />
           <MessageArea room={room} onOpenThread={setThreadMessage} fullWidth={fullWidth} />
-          <InputBox key={room.id} />
+          <InputBox key={room.id} fullWidth={fullWidth} />
         </div>
       )}
       {threadMessage && (
