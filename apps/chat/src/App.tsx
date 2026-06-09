@@ -1120,8 +1120,8 @@ function InputBox({ fullWidth }: { fullWidth: boolean }) {
 
   return (
     <div className={fullWidth ? 'bg-surface px-4 py-3 shrink-0' : 'bg-surface px-6 py-3 shrink-0'}>
-      {/* fullWidth=true → no max-width, 16px side padding; fullWidth=false → max 960px, centered */}
-      <div className="mx-auto" style={fullWidth ? undefined : { maxWidth: 960 }}>
+      {/* fullWidth=true → no max-width, 16px side padding; fullWidth=false → max 880px, centered */}
+      <div className="mx-auto" style={fullWidth ? undefined : { maxWidth: 880 }}>
       <div className="rounded-xl border border-border bg-canvas px-3 py-2 focus-within:border-border-hover">
         <Textarea
           ref={ref}
