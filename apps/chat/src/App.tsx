@@ -739,7 +739,15 @@ function TeamsCallButton() {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Button variant="text" size="md" startIcon={Video} endIcon={ChevronDown} aria-label="Teams call" title="" />
+        {/* 28px tall, 4px side padding, 18px icons */}
+        <button
+          type="button"
+          aria-label="Teams call"
+          className="flex h-7 items-center gap-1 rounded-md px-1 text-fg-secondary hover:bg-neutral-hover"
+        >
+          <Video size={18} />
+          <ChevronDown size={18} />
+        </button>
       </TooltipTrigger>
       <TooltipContent>Teams call</TooltipContent>
     </Tooltip>
@@ -750,9 +758,20 @@ function RoomInfoButton({ count }: { count: number }) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Button variant="text" size="md" startIcon={Users} aria-label="Room information" title="">
-          <span className="rounded-md bg-muted px-1.5 py-0.5 text-caption font-medium text-fg-secondary">{count}</span>
-        </Button>
+        {/* 28px tall, 4px side padding, 18px icon; badge h20 px4 py2 12px/130% medium */}
+        <button
+          type="button"
+          aria-label="Room information"
+          className="flex h-7 items-center gap-1 rounded-md px-1 text-fg-secondary hover:bg-neutral-hover"
+        >
+          <Users size={18} />
+          <span
+            className="flex h-5 items-center rounded-md bg-muted font-medium text-fg-secondary"
+            style={{ paddingLeft: 4, paddingRight: 4, paddingTop: 2, paddingBottom: 2, fontSize: 12, lineHeight: '130%' }}
+          >
+            {count}
+          </span>
+        </button>
       </TooltipTrigger>
       <TooltipContent>Room information</TooltipContent>
     </Tooltip>
@@ -778,7 +797,7 @@ function HeaderMoreMenu({
       <Tooltip>
         <TooltipTrigger asChild>
           <DropdownMenuTrigger asChild>
-            <Button variant="text" size="md" iconOnly startIcon={MoreHorizontal} aria-label="More" title="" />
+            <Button variant="text" size="sm" iconOnly startIcon={MoreHorizontal} aria-label="More" title="" />
           </DropdownMenuTrigger>
         </TooltipTrigger>
         <TooltipContent>More</TooltipContent>
@@ -844,18 +863,18 @@ function ConversationHeader({
   const roomAvatar = isMuted ? (
     <MutedAvatar size={32} />
   ) : room.type === 'dm' && room.person ? (
-    <PersonAvatar person={room.person} size={36} />
+    <PersonAvatar person={room.person} size={32} />
   ) : (
-    <GroupAvatar size={36} />
+    <GroupAvatar size={32} />
   )
 
   return (
-    <header className="flex items-center gap-2.5 h-[var(--chrome-header-height)] px-4 border-b border-divider bg-surface shrink-0">
+    <header className="flex items-center gap-2.5 py-2 px-4 border-b border-divider bg-surface shrink-0">
       {!listOpen && (
         <>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="text" size="md" iconOnly startIcon={PanelLeftOpen} aria-label="Expand sidebar" title="" onClick={onExpandList} />
+              <Button variant="text" size="sm" iconOnly startIcon={PanelLeftOpen} aria-label="Expand sidebar" title="" onClick={onExpandList} />
             </TooltipTrigger>
             <TooltipContent>Expand sidebar</TooltipContent>
           </Tooltip>
@@ -864,22 +883,22 @@ function ConversationHeader({
       )}
       {roomAvatar}
       <div className="flex min-w-0 flex-1 items-center gap-1.5">
-        <h1 className="truncate text-body-lg font-semibold">{room.title}</h1>
+        <h1 className="truncate" style={{ fontSize: 16, fontWeight: 500, lineHeight: '130%' }}>{room.title}</h1>
         {room.type === 'general' && (
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="text" size="md" iconOnly startIcon={Pencil} aria-label="Edit chatroom name" title="" />
+              <Button variant="text" size="sm" iconOnly startIcon={Pencil} aria-label="Edit chatroom name" title="" />
             </TooltipTrigger>
             <TooltipContent>Edit name</TooltipContent>
           </Tooltip>
         )}
       </div>
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-2">
         <TeamsCallButton />
         {room.type === 'general' && <RoomInfoButton count={memberCount} />}
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="text" size="md" iconOnly startIcon={Search} aria-label="Search" title="" />
+            <Button variant="text" size="sm" iconOnly startIcon={Search} aria-label="Search" title="" />
           </TooltipTrigger>
           <TooltipContent>Search</TooltipContent>
         </Tooltip>

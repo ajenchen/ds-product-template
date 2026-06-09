@@ -82,10 +82,11 @@ ChatList
 
 ```
 Conversation
-├── ConversationHeader
-│   ├── 頭像（靜音時換成 MutedAvatar 32×32）+ 室名
-│   ├── TeamsCallButton / 搜尋
-│   └── HeaderMoreMenu
+├── ConversationHeader   (上下 padding 8px `py-2`；avatar 32×32；標題 16px / medium / lh 130%)
+│   ├── 頭像（靜音時換成 MutedAvatar 32×32）+ 室名 + Edit 按鈕(28×28)
+│   ├── TeamsCallButton（h28 / px4 / 18px icons）/ RoomInfoButton（h28 / px4 / 18px icon + badge h20 px4 py2 12px/130% medium）/ Search(28×28)
+│   ├── 按鈕群 spacing 8px（`gap-2`），icon-only 按鈕一律 size="sm"=28×28
+│   └── HeaderMoreMenu (28×28 trigger)
 │       ├── Full width        (inline Switch 切換)
 │       ├── Mute / Unmute
 │       └── Search / Room info…
