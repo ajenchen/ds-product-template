@@ -1,7 +1,7 @@
 // Chat prototype — 3-column messaging UI(Nav rail / Chat list / Conversation + Thread panel)
 // v3.1: tooltip fix / overflow fix / header mute / status outside bubble / reaction menus / thread panel cleanup
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import {
   TooltipProvider,
   Tooltip,
@@ -88,17 +88,19 @@ function NavBtn({
   onClick?: () => void
   overlayBadge?: React.ReactNode
 }) {
+  // DS Button auto-adds a TOP tooltip when iconOnly + a *string* aria-label is passed.
+  // To keep a single RIGHT-side tooltip (and overlayBadge, which needs iconOnly), we avoid
+  // the string aria-label and supply the accessible name via aria-labelledby → sr-only span.
+  const labelId = useId()
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        {/* title="" suppresses the browser-native tooltip from aria-label */}
         <Button
           variant="text"
           size="md"
           iconOnly
           startIcon={icon}
-          aria-label={label}
-          title=""
+          aria-labelledby={labelId}
           onClick={onClick}
           overlayBadge={overlayBadge}
           className={active ? '!bg-neutral-selected' : ''}
@@ -106,6 +108,7 @@ function NavBtn({
       </TooltipTrigger>
       {/* avoidCollisions=false forces right side always — prevents Radix from flipping to top */}
       <TooltipContent side="right" avoidCollisions={false}>{label}</TooltipContent>
+      <span id={labelId} className="sr-only">{label}</span>
     </Tooltip>
   )
 }
@@ -407,6 +410,7 @@ function Logo() {
 
 function NavRail({ unreadCount, onOpenSettings }: { unreadCount: number; onOpenSettings: () => void }) {
   const [tab, setTab] = useState<'home' | 'chat'>('chat')
+  const moreLabelId = useId()
 
   return (
     <nav className="flex w-12 shrink-0 flex-col items-center border-r border-divider bg-surface py-2">
@@ -425,15 +429,16 @@ function NavRail({ unreadCount, onOpenSettings }: { unreadCount: number; onOpenS
         />
       </div>
       <div className="mt-auto flex flex-col items-center gap-1 py-1">
-        {/* More menu — single Tooltip wrapping the trigger */}
+        {/* More menu — single RIGHT tooltip; aria-labelledby (not string aria-label) avoids DS auto top-tooltip */}
         <DropdownMenu>
           <Tooltip>
             <TooltipTrigger asChild>
               <DropdownMenuTrigger asChild>
-                <Button variant="text" size="md" iconOnly startIcon={MoreHorizontal} aria-label="More" title="" />
+                <Button variant="text" size="md" iconOnly startIcon={MoreHorizontal} aria-labelledby={moreLabelId} />
               </DropdownMenuTrigger>
             </TooltipTrigger>
             <TooltipContent side="right" avoidCollisions={false}>More</TooltipContent>
+            <span id={moreLabelId} className="sr-only">More</span>
           </Tooltip>
           <DropdownMenuContent align="end" side="right" sideOffset={8}>
             <DropdownMenuItem startIcon={Settings} onSelect={onOpenSettings}>Settings</DropdownMenuItem>
@@ -630,7 +635,8 @@ function RoomRow({
   )
 }
 
-const CHAT_LIST_MIN = 260
+// Small floor only (avatar + padding) so RoomRow width adapts freely to the ResizeHandle drag
+const CHAT_LIST_MIN = 120
 const CHAT_LIST_MAX = 480
 
 function ChatList({

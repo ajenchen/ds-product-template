@@ -51,13 +51,14 @@ NavRail
 └── PersonAvatar (ME)      我的頭像
 ```
 
-- `NavBtn`：共用按鈕。tooltip 強制在右側（`avoidCollisions={false}`），`title=""` 壓掉瀏覽器原生 tooltip。
+- `NavBtn`：共用按鈕。tooltip 強制在右側（`side="right" avoidCollisions={false}`）。
+  - **重要**：DS Button 在 `iconOnly` + **string** `aria-label` 時會自動補一個 side="top" 的 tooltip（無法調位置）→ 會出現雙 tooltip。解法：**不傳 string `aria-label`**，改用 `aria-labelledby` 指向 sr-only span 保住無障礙名稱，讓 DS auto-tooltip 條件失效，只剩我們 right-side 的單一 tooltip。此規則僅 apply 在 nav rail 按鈕。
 
 ---
 
 ## 2. Chat list — `function ChatList`
 
-寬度範圍：`CHAT_LIST_MIN = 260` ~ `CHAT_LIST_MAX = 480`。
+寬度範圍：`CHAT_LIST_MIN = 120`（小安全 floor，讓 RoomRow 寬度隨 ResizeHandle 自由縮放）~ `CHAT_LIST_MAX = 480`。
 
 ```
 ChatList
