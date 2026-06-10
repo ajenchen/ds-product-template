@@ -52,6 +52,20 @@ Plus on-demand 讀 `ds-canonical/` 內:
 - `references/` — naming-conventions / ssot-consultation / tailwind-gotchas / props-naming 等 SSOT lookup tables
 - `skills/` — 22 skills(/prototype / /component-quality-gate / /codify-corrections 等)— via plugin install 也 expose
 
+### 🧩 寫某元件 UI 前必讀:DS 官方範例(stories)= 最新最正確的設計參考
+
+**重要**:DS npm 套件**已 ship 全部元件範例原始碼**到 `node_modules/@qijenchen/design-system/src/`(含全部 197 支 `.stories.tsx` + 同元件 `.spec.md`,**含 internal 元件**)。寫某元件 UI 前 / 不確定 composition 怎麼排時,**先讀對應元件的 stories 看官方真實寫法**,不要憑記憶寫 simplified mock(憑記憶寫 = 漏 slot / 漏 prop / 視覺跑版的根因):
+
+```bash
+# 看某元件官方 composition 範例(取代 Figma inspect / 憑印象):
+@node_modules/@qijenchen/design-system/src/components/<Name>/<name>.stories.tsx
+@node_modules/@qijenchen/design-system/src/components/<Name>/<name>.spec.md          # 何時用 / variant / size / 設計原則
+# pattern 同理:src/patterns/<name>/<name>.stories.tsx
+# 全範例索引:@node_modules/@qijenchen/design-system/ds-story-manifest.json(62 元件 / 914 story id)
+```
+
+範例隨 `npm install @qijenchen/design-system@beta`(或 `sync-all` / Dependabot)自動更新到最新 = 天然 SSOT、不 drift。本 repo 自己的 Storybook 只放 product 範例(`apps/**`),DS 元件範例**不在本 repo render**,看 rendered 版到 DS 部署的 Storybook(<https://ajenchen-design-system.netlify.app/>);**AI 取設計參考則直接讀上面 node_modules 的 source**(雲端 sandbox 讀 source 比開網頁可靠)。
+
 → **DS canonical 永遠是 SSOT,本 repo 規則只 extend / override consumer-specific 部分**。
 
 ---
