@@ -93,8 +93,9 @@ Conversation
 │       └── Search / Room info…
 ├── MessageArea
 │   └── MessageBubble × n
-│       ├── 我的: bg #EBEEFF、時間在上、status icon 在泡泡外；泡泡四角圓角 rounded-xl (12px)
-│       ├── 對方: 頭像 + 名稱 + 時間 (sm/400 12px/130% neutral-7)；名稱與時間間距 8px；名稱+時間列與泡泡間距 4px
+│       ├── 我的: bg #EBEEFF、時間在上、status icon (16×16) 在泡泡外；泡泡四角圓角 rounded-xl (12px)
+│       │      邊距(MessageArea layout): bubble 左緣撐滿時距 region 左緣 96px(paddingLeft)；status icon 距 region 右緣 20px(paddingRight)；bubble↔icon 4px gap；無 icon 仍保留 16px 寬
+│       ├── 對方: 頭像 + 名稱 + 時間 (sm/400 12px/130% neutral-7)；名稱與時間間距 8px；名稱+時間列與泡泡間距 4px；bubble 右緣撐滿跨行時距 region 右緣 96px(paddingRight)，短訊息自然內縮
 │       ├── 泡泡 padding p-3 (12px)；reactions emoji 按鈕一律 h-6/px-2/py-1/border neutral-5（含 Add reaction 按鈕，樣式一致）/emoji 16px/count neutral-8
 │       ├── ReactionBar (z-[8]；hover 顯示；hideReplyInThread 時不顯示 Reply in thread 按鈕)
 │       ├── ReactionMoreMenu  (mine vs other 不同選單；`side="bottom" sideOffset={8}`，保留 Radix 碰撞避讓)

@@ -965,9 +965,9 @@ function ConversationHeader({
 
 // Message status icon (outside bubble)
 function MsgStatusIcon({ status }: { status: MsgStatus }) {
-  if (status === 'sending') return <Clock size={12} className="text-fg-secondary" />
-  if (status === 'sent') return <Check size={12} className="text-fg-secondary" />
-  return <CheckCheck size={12} className="text-primary" />
+  if (status === 'sending') return <Clock size={16} className="text-fg-secondary" />
+  if (status === 'sent') return <Check size={16} className="text-fg-secondary" />
+  return <CheckCheck size={16} className="text-primary" />
 }
 
 // Reaction bar more menu — different actions for mine vs other
@@ -1066,112 +1066,153 @@ function MessageBubble({
     ? message.threadMessages[message.threadMessages.length - 1].time
     : null
 
+  // Bubble (shared) — text + images + reactions
+  const bubble = (
+    <div className="relative min-w-0">
+      <ReactionBar onOpenThread={() => onOpenThread(message)} mine={mine} room={room} hideReplyInThread={isInThread} />
+      <div
+        className={`rounded-xl p-3 text-body ${mine ? 'text-foreground' : 'bg-muted text-foreground'}`}
+        style={mine ? { backgroundColor: '#EBEEFF' } : undefined}
+      >
+        <p className="whitespace-pre-wrap break-words">{message.text}</p>
+        {message.images && message.images.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {message.images.map((src, i) => (
+              <img
+                key={i}
+                src={src}
+                alt=""
+                className="rounded-lg object-cover"
+                style={{ maxWidth: '100%', maxHeight: 280 }}
+              />
+            ))}
+          </div>
+        )}
+        {message.reactions && message.reactions.length > 0 && (
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            {message.reactions.map((r) => (
+              <button
+                key={r.emoji}
+                type="button"
+                className="flex h-6 items-center gap-1 rounded-full border bg-surface px-2 py-1 hover:bg-neutral-hover"
+                style={{ borderColor: 'var(--color-neutral-5)' }}
+              >
+                <span style={{ fontSize: 16 }}>{r.emoji}</span>
+                <span style={{ color: 'var(--color-neutral-8)' }}>{r.count}</span>
+              </button>
+            ))}
+            <button
+              type="button"
+              aria-label="Add reaction"
+              className="flex h-6 items-center rounded-full border bg-surface px-2 py-1 text-fg-secondary hover:bg-neutral-hover hover:text-foreground"
+              style={{ borderColor: 'var(--color-neutral-5)' }}
+            >
+              <SmilePlus size={16} />
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+
+  // Thread replies link (main area only)
+  const threadLink = !isInThread && replyCount > 0 ? (
+    <div className={`mt-0.5 flex items-center gap-1 ${mine ? 'justify-end' : ''}`}>
+      {!mine && (
+        <div
+          className="shrink-0 border-l border-b rounded-bl-[8px]"
+          style={{ width: 24, height: 12, borderColor: 'var(--color-neutral-4)' }}
+        />
+      )}
+      <button
+        type="button"
+        className="flex items-center gap-1 text-info-text hover:underline"
+        onClick={() => onOpenThread(message)}
+      >
+        <MessagesSquare size={16} />
+        <span style={{ fontSize: 12, fontWeight: 500, lineHeight: '130%' }}>{replyCount} replies</span>
+        {latestReplyTime && (
+          <span style={{ fontSize: 12, fontWeight: 400, lineHeight: '130%', color: 'var(--color-neutral-7)', marginLeft: 4 }}>{latestReplyTime}</span>
+        )}
+      </button>
+    </div>
+  ) : null
+
+  // ── Thread panel layout (narrow, simpler — no MessageArea margin rules) ──
+  if (isInThread) {
+    return (
+      <div className={`group/msg flex flex-col ${mine ? 'items-end' : 'items-start'}`}>
+        <div className={`flex items-start gap-2 ${mine ? 'flex-row-reverse' : ''} max-w-[85%]`}>
+          {!mine && author && (
+            <div className="mt-0.5 shrink-0">
+              <PersonAvatar person={author} size={32} />
+            </div>
+          )}
+          <div className="flex flex-col gap-1 min-w-0">
+            {mine && (
+              <div className="flex justify-end pr-1">
+                <span style={{ fontSize: 12, fontWeight: 400, lineHeight: '130%', color: 'var(--color-neutral-7)' }}>{message.time}</span>
+              </div>
+            )}
+            {!mine && author && (
+              <div className="flex items-center gap-2">
+                <span style={{ fontSize: 12, fontWeight: 400, lineHeight: '130%', color: 'var(--color-neutral-7)' }}>{author.name}</span>
+                <span style={{ fontSize: 12, fontWeight: 400, lineHeight: '130%', color: 'var(--color-neutral-7)' }}>{message.time}</span>
+              </div>
+            )}
+            {bubble}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── MessageArea layout (precise margin spec 3b) ──
+  // Status icon column: 16×16, always reserved (mine). Empty box keeps the 16px width.
+  const statusCol = (
+    <div className="shrink-0 flex flex-col justify-end" style={{ width: 16, marginLeft: 4 }}>
+      <div className="pb-1 flex items-center justify-center" style={{ width: 16, height: 16 }}>
+        {isLastMine && message.msgStatus ? <MsgStatusIcon status={message.msgStatus} /> : null}
+      </div>
+    </div>
+  )
+
+  if (mine) {
+    // bubble left edge ≥ 96px from region left; status icon right edge 20px from region right
+    return (
+      <div className="group/msg flex w-full justify-end" style={{ paddingLeft: 96, paddingRight: 20 }}>
+        <div className="flex items-end">
+          <div className="flex flex-col gap-1 min-w-0 items-end">
+            <div className="flex justify-end pr-1">
+              <span style={{ fontSize: 12, fontWeight: 400, lineHeight: '130%', color: 'var(--color-neutral-7)' }}>{message.time}</span>
+            </div>
+            {bubble}
+            {threadLink}
+          </div>
+          {statusCol}
+        </div>
+      </div>
+    )
+  }
+
+  // other: avatar at region left; bubble right edge ≤ region right − 96px
   return (
-    <div className={`group/msg flex flex-col ${mine ? 'items-end' : 'items-start'}`}>
-      <div className={`flex items-start gap-2 ${mine ? 'flex-row-reverse' : ''} max-w-[80%]`}>
-        {/* Other user avatar — top-aligned with name */}
-        {!mine && author && (
+    <div className="group/msg flex w-full" style={{ paddingRight: 96 }}>
+      <div className="flex items-start gap-2 min-w-0">
+        {author && (
           <div className="mt-0.5 shrink-0">
             <PersonAvatar person={author} size={32} />
           </div>
         )}
-
         <div className="flex flex-col gap-1 min-w-0">
-          {/* My message: time above bubble */}
-          {mine && (
-            <div className="flex justify-end pr-1">
-              <span style={{ fontSize: 12, fontWeight: 400, lineHeight: '130%', color: 'var(--color-neutral-7)' }}>{message.time}</span>
-            </div>
-          )}
-
-          {/* Other: name + time above bubble — sm/400 12px/130% */}
-          {!mine && author && (
+          {author && (
             <div className="flex items-center gap-2">
               <span style={{ fontSize: 12, fontWeight: 400, lineHeight: '130%', color: 'var(--color-neutral-7)' }}>{author.name}</span>
               <span style={{ fontSize: 12, fontWeight: 400, lineHeight: '130%', color: 'var(--color-neutral-7)' }}>{message.time}</span>
             </div>
           )}
-
-          {/* Bubble row: bubble + status icon to the right (mine only, 8px gap) */}
-          <div className={`flex items-end gap-2 ${mine ? 'flex-row-reverse' : ''}`}>
-            {mine && isLastMine && message.msgStatus && (
-              <span className="shrink-0 pb-1">
-                <MsgStatusIcon status={message.msgStatus} />
-              </span>
-            )}
-
-            {/* Bubble */}
-            <div className="relative min-w-0">
-              <ReactionBar onOpenThread={() => onOpenThread(message)} mine={mine} room={room} hideReplyInThread={isInThread} />
-              <div
-                className={`rounded-xl p-3 text-body ${
-                  mine ? 'text-foreground' : 'bg-muted text-foreground'
-                }`}
-                style={mine ? { backgroundColor: '#EBEEFF' } : undefined}
-              >
-                <p className="whitespace-pre-wrap break-words">{message.text}</p>
-                {message.images && message.images.length > 0 && (
-                  <div className={`mt-2 flex flex-wrap gap-2 ${message.images.length === 1 ? '' : ''}`}>
-                    {message.images.map((src, i) => (
-                      <img
-                        key={i}
-                        src={src}
-                        alt=""
-                        className="rounded-lg object-cover"
-                        style={{ maxWidth: '100%', maxHeight: 280 }}
-                      />
-                    ))}
-                  </div>
-                )}
-                {message.reactions && message.reactions.length > 0 && (
-                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                    {message.reactions.map((r) => (
-                      <button
-                        key={r.emoji}
-                        type="button"
-                        className="flex h-6 items-center gap-1 rounded-full border bg-surface px-2 py-1 hover:bg-neutral-hover"
-                        style={{ borderColor: 'var(--color-neutral-5)' }}
-                      >
-                        <span style={{ fontSize: 16 }}>{r.emoji}</span>
-                        <span style={{ color: 'var(--color-neutral-8)' }}>{r.count}</span>
-                      </button>
-                    ))}
-                    <button
-                      type="button"
-                      aria-label="Add reaction"
-                      className="flex h-6 items-center rounded-full border bg-surface px-2 py-1 text-fg-secondary hover:bg-neutral-hover hover:text-foreground"
-                      style={{ borderColor: 'var(--color-neutral-5)' }}
-                    >
-                      <SmilePlus size={16} />
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Thread replies link — only in main area (not inside thread panel) */}
-          {!isInThread && replyCount > 0 && (
-            <div className={`mt-0.5 flex items-center gap-1 ${mine ? 'justify-end' : ''}`}>
-              {!mine && (
-                <div
-                  className="shrink-0 border-l border-b rounded-bl-[8px]"
-                  style={{ width: 24, height: 12, borderColor: 'var(--color-neutral-4)' }}
-                />
-              )}
-              <button
-                type="button"
-                className="flex items-center gap-1 text-info-text hover:underline"
-                onClick={() => onOpenThread(message)}
-              >
-                <MessagesSquare size={16} />
-                <span style={{ fontSize: 12, fontWeight: 500, lineHeight: '130%' }}>{replyCount} replies</span>
-                {latestReplyTime && (
-                  <span style={{ fontSize: 12, fontWeight: 400, lineHeight: '130%', color: 'var(--color-neutral-7)', marginLeft: 4 }}>{latestReplyTime}</span>
-                )}
-              </button>
-            </div>
-          )}
+          {bubble}
+          {threadLink}
         </div>
       </div>
     </div>
