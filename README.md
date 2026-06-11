@@ -135,7 +135,7 @@ ds-product-template/
 
 Then plugin auto-enables (`.claude/settings.json` `defaultMode: "auto"`). You get:
 - 22+ skills (`/component-quality-gate`, `/visual-audit`, etc.)
-- 59 hooks (auto-fire pre/post tool events)
+- 52 hooks (auto-fire pre/post tool events)
 - 31 active M-rules (CLAUDE.md instructions inherit on every session)
 
 ## Important rules(read CLAUDE.md from `design-system` repo via plugin)
@@ -156,7 +156,7 @@ Then plugin auto-enables (`.claude/settings.json` `defaultMode: "auto"`). You ge
 ```bash
 claude                                                         # ① 啟動 Claude Code
 # 內輸: /plugin marketplace add github:ajenchen/design-system    # ② 拿 DS 治理 plugin
-# 內輸: /plugin install design-system@qijenchen-ds                #    啟用 22 skills + 59 hooks
+# 內輸: /plugin install design-system@qijenchen-ds                #    啟用 22 skills + 52 hooks
 npm run setup:netlify                                          # ③ Netlify OAuth + 印 dashboard URL
 # Netlify Dashboard → Environment variables → 加 STORYBOOK_BASIC_AUTH=user:password(免費上密碼)
 ```
