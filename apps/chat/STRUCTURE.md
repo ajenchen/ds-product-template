@@ -28,13 +28,14 @@ App  (export default)
 
 | 變數 | 型別 | 用途 |
 |---|---|---|
+| `rooms` | Room[] | 全部聊天室（含已送出訊息，初始值 `INITIAL_ROOMS`）|
 | `activeId` | string | 目前選中的聊天室 |
 | `listOpen` | bool | ChatList 是否展開 |
 | `listWidth` | number | ChatList 寬度（260–480px）|
 | `showPreview` | bool | 列表是否顯示訊息預覽（Settings 控制）|
 | `settingsOpen` | bool | Settings modal 開關 |
 | `mutedIds` | Set\<string\> | 被靜音的聊天室 |
-| `fullWidth` | bool | 訊息區全寬 / 960px 置中（預設 true = 全寬）|
+| `fullWidth` | bool | 訊息區全寬 / 880px 置中（預設 true = 全寬）|
 | `favOrder` | string[] | 我的最愛排序 |
 
 ---
@@ -98,7 +99,7 @@ Conversation
 │       ├── ReactionBar (z-[8]；hover 顯示；hideReplyInThread 時不顯示 Reply in thread 按鈕)
 │       ├── ReactionMoreMenu  (mine vs other 不同選單；`side="bottom" sideOffset={8}`，保留 Radix 碰撞避讓)
 │       └── Thread replies link: shrink-0 L-connector 24×12（border-l/b 1px neutral-4 + rounded-bl-[8px] 圓角，橫線落在 24×24 視覺垂直中點 y=12）+ MessagesSquare 16 + "N replies" sm/500 + 最新回覆時間 sm/400 neutral-7
-├── InputBox                  (無頂部分隔線；接受 `fullWidth` prop。ON=全寬；OFF=max 880px 置中；左右 padding 一律 px-4=16px)
+├── InputBox                  (接受 `fullWidth` + `onSend` prop。ON=全寬；OFF=max 880px 置中。單行：textarea + buttons 同排；多行：textarea 全寬在上，buttons 獨立在下。外框 padding top/bottom 6px / left 12px / right 8px。外層 pt-2=8px / pb-4=16px)
 └── ThreadPanel               寬 320~720，可拉寬（ResizeHandle line 1px neutral-4）
     ├── 父訊息（MessageBubble isInThread，下方無 "N replies" 分隔線）+ 回覆訊息（MessageBubble isInThread，ReactionBar 無 Reply in thread）
     ├── `Message.threadMessages?: Message[]` 存實際回覆內容；replies count/latestReplyTime 由此衍生
@@ -138,11 +139,12 @@ type MsgStatus = 'sending' | 'sent' | 'read'
 
 type Person  = { name; color; status: Presence; role; email; avatar }
 type Reaction = { emoji; count }
-type Message = { id; author; text; time; status: MsgStatus; reactions[]; replies; threadMessages[] }
+type Message = { id; author; text; time; status: MsgStatus; reactions[]; replies; threadMessages[]; images?: string[] }
 type Room    = { id; name; type; section: 'favorites' | 'chats'; unread; messages[] }
 ```
 
-假資料常數：`PEOPLE`（柯南角色）· `ME` · `ROOMS` · `COMMON_EMOJI`。
+假資料常數：`PEOPLE`（柯南角色）· `ME` · `INITIAL_ROOMS`（含長訊息 + inline image 範例）· `COMMON_EMOJI`。
+App 以 `useState(INITIAL_ROOMS)` 管理 rooms，`handleSend` 在 active room 尾端 append 新訊息。
 
 ---
 
@@ -154,4 +156,6 @@ type Room    = { id; name; type; section: 'favorites' | 'chats'; unread; message
 | `THREAD_MIN` / `THREAD_MAX` | 320 / 720 | Thread panel 寬度範圍 |
 | MessageArea max-width (fullWidth=false) | 960px | 訊息區置中上限 |
 | MessageArea padding | `px-4 py-4` (16px) | fullWidth ON/OFF 均同 |
+| MessageBubble gap | `gap-3` (12px) | 訊息間距 |
+| InputBox max-width (fullWidth=false) | 880px | InputBox 置中上限 |
 | 我的泡泡背景 | `#EBEEFF` | — |

@@ -175,6 +175,7 @@ type Message = {
   replies?: number
   msgStatus?: MsgStatus
   threadMessages?: Message[]
+  images?: string[]
 }
 
 type Room = {
@@ -200,7 +201,7 @@ const PEOPLE: Record<string, Person> = {
 
 const ME: Person = { name: 'Me 我', color: 'green', status: 'online', role: 'You', email: 'me@teachat.app', avatar: 'https://i.pravatar.cc/96?img=8' }
 
-const ROOMS: Room[] = [
+const INITIAL_ROOMS: Room[] = [
   {
     id: 'shinichi',
     type: 'dm',
@@ -221,6 +222,23 @@ const ROOMS: Room[] = [
       ] },
       { id: 'm2', author: 'me', text: 'All set — 10:30 in tasting room No.3.', time: '09:14', msgStatus: 'sent' },
       { id: 'm3', author: 'shinichi', text: 'Great, I will prepare the scoring sheet.', time: '09:15' },
+      {
+        id: 'm4', author: 'shinichi', time: '09:18',
+        text: "Just finished reviewing the Dong Ding samples from the Lugu Co-op. The spring harvest this year is noticeably lighter in body than last year — likely due to the unusually dry March. The roast on batch #3 is particularly interesting though; it has this subtle honey-caramel finish that lingers for almost a minute. I think it could be a strong candidate for the premium single-origin line. Can you pull the moisture readings and compare against the Q1 benchmark?",
+      },
+      {
+        id: 'm5', author: 'me', time: '09:21', msgStatus: 'read',
+        text: 'Here are the moisture readings from the lab — batch #3 is definitely the standout.',
+        images: ['https://picsum.photos/seed/tealeaf1/480/300', 'https://picsum.photos/seed/teacup2/480/280'],
+      },
+      {
+        id: 'm6', author: 'shinichi', time: '09:23',
+        text: "These look really promising. The color on batch #3 is exactly what we want — golden amber, no greenish tint. I also noticed in the second photo that the leaf unfurl looks very even, which usually correlates with consistent steeping performance. Let's reserve at least 20 kg for the premium line and run a blind comparison with last year's Alishan at Friday's session.",
+      },
+      {
+        id: 'm7', author: 'me', time: '09:25', msgStatus: 'read',
+        text: "Agreed. I'll block the 20 kg now. Should we invite the retail buyers to Friday's tasting, or keep it internal this round?",
+      },
     ],
   },
   {
@@ -242,6 +260,19 @@ const ROOMS: Room[] = [
         { id: 'g1-t8', author: 'me', text: 'Great, see you at standup.', time: '08:44' },
       ] },
       { id: 'g2', author: 'me', text: 'Got it, reviewing now.', time: '08:42', msgStatus: 'read' },
+      {
+        id: 'g3', author: 'yating', time: '08:50',
+        text: "I updated the tasting room layout — we now have a dedicated aroma station near the window for better lighting conditions. Here's how it looks:",
+        images: ['https://picsum.photos/seed/room88/560/360'],
+      },
+      {
+        id: 'g4', author: 'kenji', time: '08:52',
+        text: 'Nice setup! One thing — the infra for the water temperature controllers is finally stable. We had the 95°C drift issue last week where the PID loop was overshooting by about 3°C before stabilising. I pushed a firmware fix and ran 50 cycles overnight; max deviation is now under 0.5°C. Should be solid for Friday.',
+      },
+      {
+        id: 'g5', author: 'me', time: '08:55', msgStatus: 'read',
+        text: 'Great news on the temp fix, Kenji. I will add that to the session notes so the buyers know we hit spec.',
+      },
     ],
   },
   {
@@ -662,6 +693,7 @@ const CHAT_LIST_MIN = 120
 const CHAT_LIST_MAX = 480
 
 function ChatList({
+  rooms,
   activeId,
   onSelect,
   onCollapse,
@@ -673,6 +705,7 @@ function ChatList({
   onToggleMute,
   onToggleFavorite,
 }: {
+  rooms: Room[]
   activeId: string
   onSelect: (id: string) => void
   onCollapse: () => void
@@ -689,8 +722,8 @@ function ChatList({
   const [dragging, setDragging] = useState(false)
 
   const favSet = new Set(favOrder)
-  const favorites = favOrder.map((id) => ROOMS.find((r) => r.id === id)!).filter(Boolean)
-  const chats = ROOMS.filter((r) => !favSet.has(r.id))
+  const favorites = favOrder.map((id) => rooms.find((r) => r.id === id)!).filter(Boolean)
+  const chats = rooms.filter((r) => !favSet.has(r.id))
 
   function startResize(e: React.PointerEvent) {
     e.preventDefault()
@@ -1077,6 +1110,19 @@ function MessageBubble({
                 style={mine ? { backgroundColor: '#EBEEFF' } : undefined}
               >
                 <p className="whitespace-pre-wrap break-words">{message.text}</p>
+                {message.images && message.images.length > 0 && (
+                  <div className={`mt-2 flex flex-wrap gap-2 ${message.images.length === 1 ? '' : ''}`}>
+                    {message.images.map((src, i) => (
+                      <img
+                        key={i}
+                        src={src}
+                        alt=""
+                        className="rounded-lg object-cover"
+                        style={{ maxWidth: '100%', maxHeight: 280 }}
+                      />
+                    ))}
+                  </div>
+                )}
                 {message.reactions && message.reactions.length > 0 && (
                   <div className="mt-2 flex flex-wrap items-center gap-1.5">
                     {message.reactions.map((r) => (
@@ -1134,67 +1180,108 @@ function MessageBubble({
 
 function MessageArea({ room, onOpenThread, fullWidth }: { room: Room; onOpenThread: (m: Message) => void; fullWidth: boolean }) {
   const lastMineId = [...room.messages].reverse().find((m) => m.author === 'me')?.id ?? null
+  const bottomRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [room.messages.length])
+
   return (
     <ScrollArea className="min-h-0 flex-1">
-      {/* fullWidth=true → no max-width constraint, 16px padding each side
-          fullWidth=false → capped at 960px, centered, px-6 outer padding */}
       <div className="px-4 py-4">
         <div
-          className="mx-auto flex flex-col gap-5"
+          className="mx-auto flex flex-col gap-3"
           style={fullWidth ? undefined : { maxWidth: 960 }}
         >
           {room.messages.map((m) => (
             <MessageBubble key={m.id} message={m} isLastMine={m.id === lastMineId} onOpenThread={onOpenThread} room={room} />
           ))}
+          <div ref={bottomRef} />
         </div>
       </div>
     </ScrollArea>
   )
 }
 
-// InputBox — no top separator on the outer container
-function InputBox({ fullWidth }: { fullWidth: boolean }) {
+// InputBox — no top separator; single-line: textarea + buttons on same row;
+// multiline: textarea full-width on top, buttons row below
+function InputBox({ fullWidth, onSend }: { fullWidth: boolean; onSend: (text: string) => void }) {
   const [value, setValue] = useState('')
+  const [multiline, setMultiline] = useState(false)
   const ref = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     const el = ref.current
     if (!el) return
     el.style.height = 'auto'
-    el.style.height = `${Math.min(el.scrollHeight, 160)}px`
+    const scrollH = el.scrollHeight
+    el.style.height = `${Math.min(scrollH, 160)}px`
+    setMultiline(value.includes('\n') || scrollH > 44)
   }, [value])
 
-  function send() { setValue('') }
+  function send() {
+    if (!value.trim()) return
+    onSend(value.trim())
+    setValue('')
+    setMultiline(false)
+  }
+
+  const actionButtons = (
+    <div className="flex shrink-0 items-center gap-0.5">
+      <IconBtnSm icon={Type} label="Rich editor" />
+      <IconBtnSm icon={Smile} label="Emoji" />
+      <IconBtnSm icon={Plus} label="Attach files" />
+      <Separator orientation="vertical" className="mx-1 h-5" />
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button variant="primary" size="sm" iconOnly startIcon={Send} aria-label="Send" title="" onClick={send} disabled={!value.trim()} />
+        </TooltipTrigger>
+        <TooltipContent>Send</TooltipContent>
+      </Tooltip>
+    </div>
+  )
 
   return (
-    <div className="bg-surface px-4 py-3 shrink-0">
-      {/* side padding 16px; fullWidth=false → max 880px, centered */}
+    <div className="shrink-0 bg-surface px-4" style={{ paddingTop: 8, paddingBottom: 16 }}>
       <div className="mx-auto" style={fullWidth ? undefined : { maxWidth: 880 }}>
-      <div className="rounded-xl border border-border bg-canvas px-3 py-2 focus-within:border-border-hover">
-        <Textarea
-          ref={ref}
-          rows={1}
-          variant="bare"
-          placeholder="Type a message"
-          aria-label="Type a message"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
-          className="!resize-none !border-0 !px-0 !py-0 max-h-40"
-        />
-        <div className="mt-1.5 flex items-center justify-end gap-0.5">
-          <IconBtnSm icon={Type} label="Rich editor" />
-          <IconBtnSm icon={Smile} label="Emoji" />
-          <IconBtnSm icon={Plus} label="Attach files" />
-          <Separator orientation="vertical" className="mx-1 h-5" />
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="primary" size="sm" iconOnly startIcon={Send} aria-label="Send" title="" onClick={send} disabled={!value.trim()} />
-            </TooltipTrigger>
-            <TooltipContent>Send</TooltipContent>
-          </Tooltip>
+        <div
+          className="rounded-xl border border-border bg-canvas focus-within:border-border-hover"
+          style={{ paddingTop: 6, paddingBottom: 6, paddingLeft: 12, paddingRight: 8 }}
+        >
+          {multiline ? (
+            <>
+              <Textarea
+                ref={ref}
+                rows={1}
+                variant="bare"
+                placeholder="Type a message"
+                aria-label="Type a message"
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
+                className="!resize-none !border-0 !p-0 w-full max-h-40"
+              />
+              <div className="mt-1.5 flex items-center justify-end">
+                {actionButtons}
+              </div>
+            </>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Textarea
+                ref={ref}
+                rows={1}
+                variant="bare"
+                placeholder="Type a message"
+                aria-label="Type a message"
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
+                className="!resize-none !border-0 !p-0 min-w-0 flex-1 max-h-40"
+              />
+              {actionButtons}
+            </div>
+          )}
         </div>
-      </div>
       </div>
     </div>
   )
@@ -1368,6 +1455,7 @@ function Conversation({
   onToggleMute,
   fullWidth,
   onToggleFullWidth,
+  onSend,
 }: {
   room: Room
   listOpen: boolean
@@ -1376,6 +1464,7 @@ function Conversation({
   onToggleMute: () => void
   fullWidth: boolean
   onToggleFullWidth: () => void
+  onSend: (text: string) => void
 }) {
   const [threadMessage, setThreadMessage] = useState<Message | null>(null)
   const [threadExpanded, setThreadExpanded] = useState(false)
@@ -1400,7 +1489,7 @@ function Conversation({
             onToggleFullWidth={onToggleFullWidth}
           />
           <MessageArea room={room} onOpenThread={setThreadMessage} fullWidth={fullWidth} />
-          <InputBox key={room.id} fullWidth={fullWidth} />
+          <InputBox key={room.id} fullWidth={fullWidth} onSend={onSend} />
         </div>
       )}
       {threadMessage && (
@@ -1421,21 +1510,20 @@ function Conversation({
 
 // ════════════════════════════════════════════════════════════════════════════
 export default function App() {
-  const [activeId, setActiveId] = useState<string>(ROOMS[0].id)
+  const [rooms, setRooms] = useState<Room[]>(INITIAL_ROOMS)
+  const [activeId, setActiveId] = useState<string>(INITIAL_ROOMS[0].id)
   const [listOpen, setListOpen] = useState(true)
   const [listWidth, setListWidth] = useState(320)
   const [showPreview, setShowPreview] = useState(true)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [mutedIds, setMutedIds] = useState<Set<string>>(new Set())
-  // fullWidth=true (default): no max-width constraint, 16px padding
-  // fullWidth=false: capped at 960px, centered
   const [fullWidth, setFullWidth] = useState(true)
   const [favOrder, setFavOrder] = useState<string[]>(
-    ROOMS.filter((r) => r.section === 'favorites').map((r) => r.id)
+    INITIAL_ROOMS.filter((r) => r.section === 'favorites').map((r) => r.id)
   )
 
-  const current = ROOMS.find((r) => r.id === activeId) ?? ROOMS[0]
-  const unreadCount = ROOMS.filter((r) => r.unread && !mutedIds.has(r.id)).length
+  const current = rooms.find((r) => r.id === activeId) ?? rooms[0]
+  const unreadCount = rooms.filter((r) => r.unread && !mutedIds.has(r.id)).length
 
   function handleToggleMute(id: string) {
     setMutedIds((prev) => {
@@ -1451,12 +1539,22 @@ export default function App() {
     else setFavOrder((prev) => [...prev, id])
   }
 
+  function handleSend(text: string) {
+    const now = new Date()
+    const time = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
+    const newMsg: Message = { id: `sent-${Date.now()}`, author: 'me', text, time, msgStatus: 'sending' }
+    setRooms((prev) => prev.map((r) =>
+      r.id === activeId ? { ...r, messages: [...r.messages, newMsg] } : r
+    ))
+  }
+
   return (
     <TooltipProvider delayDuration={400} skipDelayDuration={200}>
       <div className="flex h-screen w-full overflow-hidden bg-canvas text-foreground">
         <NavRail unreadCount={unreadCount} onOpenSettings={() => setSettingsOpen(true)} />
         {listOpen && (
           <ChatList
+            rooms={rooms}
             activeId={activeId}
             onSelect={setActiveId}
             onCollapse={() => setListOpen(false)}
@@ -1477,6 +1575,7 @@ export default function App() {
           onToggleFullWidth={() => setFullWidth((v) => !v)}
           isMuted={mutedIds.has(current.id)}
           onToggleMute={() => handleToggleMute(current.id)}
+          onSend={handleSend}
         />
       </div>
       <SettingsModal
