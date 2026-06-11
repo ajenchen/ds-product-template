@@ -1287,9 +1287,9 @@ function InputBox({ fullWidth, onSend }: { fullWidth: boolean; onSend: (text: st
   )
 
   return (
-    <div className="shrink-0 bg-surface px-4" style={{ paddingTop: 8, paddingBottom: 16 }}>
-      {/* left/right edges align with MessageArea chat-bubble region: ON full-width 16px sides, OFF max 960 centered */}
-      <div className="mx-auto" style={fullWidth ? undefined : { maxWidth: 960 }}>
+    <div className="shrink-0 bg-surface" style={{ paddingTop: 8, paddingBottom: 16, paddingLeft: 56, paddingRight: 56 }}>
+      {/* ON: full-width, 56px sides; OFF: max 880px centered, 56px sides when narrower */}
+      <div className="mx-auto w-full" style={fullWidth ? undefined : { maxWidth: 880 }}>
         <div
           className="rounded-xl border bg-canvas"
           style={{
