@@ -1,3 +1,22 @@
 @import 'tailwindcss';
 @import '@qijenchen/design-system/styles/tokens';
 @source '../../../node_modules/@qijenchen/design-system/src/**/*.{js,ts,jsx,tsx}';
+
+/* Hover-only scrollbar — used by in-message tables (horizontal + vertical) */
+.scroll-hover {
+  scrollbar-width: none; /* Firefox: hidden until hover */
+}
+.scroll-hover::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.scroll-hover::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 4px;
+}
+.scroll-hover:hover {
+  scrollbar-width: thin;
+}
+.scroll-hover:hover::-webkit-scrollbar-thumb {
+  background: var(--color-neutral-4);
+}

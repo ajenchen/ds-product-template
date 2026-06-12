@@ -97,14 +97,18 @@ Conversation
 │       │      邊距(MessageArea layout): bubble 左緣撐滿時距 region 左緣 96px(paddingLeft)；status icon 距 region 右緣 20px(paddingRight)；bubble↔icon 4px gap；無 icon 仍保留 16px 寬
 │       ├── 對方: 頭像 + 名稱 + 時間 (sm/400 12px/130% neutral-7)；名稱與時間間距 8px；名稱+時間列與泡泡間距 4px；bubble 右緣撐滿跨行時距 region 右緣 96px(paddingRight)，短訊息自然內縮
 │       ├── 泡泡 padding p-3 (12px)；reactions emoji 按鈕一律 h-6/px-2/py-1/border neutral-5（含 Add reaction 按鈕，樣式一致）/emoji 16px/count neutral-8
+│       ├── inline image: width 200px(max-w 100%) / aspect 3:2 / rounded-lg
+│       ├── table(`Message.table?: string[][]`): cell font 12px/400/130%(首列 600) + padding 4px 8px；白底(td + wrapper backgroundColor white)；多欄每欄 max-w 120 / min-w 24；單欄 max-w 隨 bubble 自適應 / min-w 24；列 min-h 24 自動長高；max-h 320px；wrapper `width:fit-content; max-width:100%` → 少欄位自然 hug 內容(不被長文字撐開的 bubble 拉寬)，多欄寬表 cap 在 bubble 寬度上限內並水平捲動；超出寬/高出現 hover-only scrollbar(`.scroll-hover`，globals.css)
+│       │      泡泡寬度: bubble 用 `max-w-full min-w-0`(非 w-fit — fit-content 會抓 table max-content 而溢出畫面)；hug 由 column 的 items-start(對方)/items-end(我的) shrink-to-fit 提供
+│       │      MessageArea 用普通 scroll div(`overflow-y-auto overflow-x-hidden` + `.scroll-hover`)取代 DS ScrollArea：Radix Viewport 內包 `display:table; min-width:100%` 會被寬 table max-content 撐大、bubble 的 % cap 失效；普通 div 寬度確定(= flex parent)，min-w-0 flex chain 才能 cap bubble + 讓 table 在泡泡內水平捲動
 │       ├── ReactionBar (z-[8]；hover 顯示；hideReplyInThread 時不顯示 Reply in thread 按鈕)
 │       ├── ReactionMoreMenu  (mine vs other 不同選單；`side="bottom" sideOffset={8}`，保留 Radix 碰撞避讓)
 │       └── Thread replies link: shrink-0 L-connector 24×12（border-l/b 1px neutral-4 + rounded-bl-[8px] 圓角，橫線落在 24×24 視覺垂直中點 y=12）+ MessagesSquare 16 + "N replies" sm/500 + 最新回覆時間 sm/400 neutral-7
-├── InputBox                  (接受 `fullWidth` + `onSend` prop。左右外側距欄位邊緣 56px；OFF=max 880px 置中，視窗窄於 880px 時仍保持 56px。單行：textarea + buttons 同排；多行：textarea 全寬在上，buttons 獨立在下。外框 padding top/bottom 6px / left 12px / right 8px；整個輸入方塊 max-height 280px（textarea clamp 232）；輸入後外框轉 primary-hover 藍框；Send 按鈕無值時 text variant(無底深線)、有值時 primary。外層 pt-2=8px / pb-4=16px)
+├── InputBox                  (接受 `fullWidth` + `onSend` prop。左右外側距欄位邊緣 56px；OFF=max 880px 置中，視窗窄於 880px 時仍保持 56px。單行：textarea + buttons 同排；多行：textarea 全寬在上，buttons 獨立在下。外框 padding top/bottom 6px / left 12px / right 8px；整個輸入方塊 max-height 280px（textarea clamp 232）；圓角 rounded-lg(8px)；輸入後外框轉 primary-hover 藍框；按鈕一律 24×24(`!h-6 !w-6 !min-w-0 !p-0`)，按鈕間距 8px(`gap-2`，同套用於 ThreadInputBox)；Send 按鈕無值時 text variant(無底深線)、有值時 primary。外層 pt-2=8px / pb-4=16px)
 └── ThreadPanel               寬 320~720，可拉寬（ResizeHandle line 1px neutral-4）
     ├── 父訊息（MessageBubble isInThread，下方無 "N replies" 分隔線）+ 回覆訊息（MessageBubble isInThread，ReactionBar 無 Reply in thread）
     ├── `Message.threadMessages?: Message[]` 存實際回覆內容；replies count/latestReplyTime 由此衍生
-    └── ThreadInputBox        含 "Also send to chatroom" checkbox（ThreadPanel 容器無 `border-l`，視覺分隔線由 ResizeHandle 1px line 提供）
+    └── ThreadInputBox        含 "Also send to chatroom" checkbox；圓角 rounded-lg(8px)；Send 按鈕 24×24 + 無值 text / 有值 primary（與主 InputBox 同規則）（ThreadPanel 容器無 `border-l`，視覺分隔線由 ResizeHandle 1px line 提供）
 ```
 
 > **ConversationHeader spec 驗證表（2026-06-09 confirmed）**：avatar 32×32(`size={32}`) · header `py-2`=上下 8px · 標題 `fontSize:16 / fontWeight:500 / lineHeight:'130%'` · icon-only 按鈕全 `size="sm"`=28×28 · 按鈕群 `gap-2`=8px · TeamsCallButton `px-1`=左右 4px + icon `size={18}` · RoomInfoButton `px-1`=4px + icon `size={18}` + badge `h-5`=20px / `pl:4 pr:4 pt:2 pb:2` / `fontSize:12 / lineHeight:'130%'` / `font-medium` · Edit 按鈕 `size="sm"`=28×28。
@@ -144,7 +148,7 @@ type Message = { id; author; text; time; status: MsgStatus; reactions[]; replies
 type Room    = { id; name; type; section: 'favorites' | 'chats'; unread; messages[] }
 ```
 
-假資料常數：`PEOPLE`（柯南角色）· `ME` · `INITIAL_ROOMS`（含長訊息 + inline image 範例）· `COMMON_EMOJI`。
+假資料常數：`PEOPLE`（柯南角色）· `ME` · `INITIAL_ROOMS`（含長訊息 + inline image 範例 + `semi-sales`「IT Sales - Table格式範例」chatroom 的 table 範例：少欄少列 forecast/utilization(hug 範例) + 30 欄 22 列 wafer starts 大表(達 max-h 320px 觸發 hover scrollbar + 水平捲動範例)）· `COMMON_EMOJI`。
 App 以 `useState(INITIAL_ROOMS)` 管理 rooms，`handleSend` 在 active room 尾端 append 新訊息。
 
 ---

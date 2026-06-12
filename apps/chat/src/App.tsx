@@ -136,15 +136,17 @@ function IconBtnSm({
   icon,
   label,
   onClick,
+  className,
 }: {
   icon: React.ComponentProps<typeof Button>['startIcon']
   label: string
   onClick?: () => void
+  className?: string
 }) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Button variant="text" size="sm" iconOnly startIcon={icon} aria-label={label} title="" onClick={onClick} />
+        <Button variant="text" size="sm" iconOnly startIcon={icon} aria-label={label} title="" onClick={onClick} className={className} />
       </TooltipTrigger>
       <TooltipContent>{label}</TooltipContent>
     </Tooltip>
@@ -176,6 +178,7 @@ type Message = {
   msgStatus?: MsgStatus
   threadMessages?: Message[]
   images?: string[]
+  table?: string[][]
 }
 
 type Room = {
@@ -309,6 +312,74 @@ const INITIAL_ROOMS: Room[] = [
     messages: [
       { id: 'p1', author: 'kenji', text: 'Deploy is green. Shipping to staging now.', time: '11:02', reactions: [{ emoji: '🚀', count: 4 }] },
       { id: 'p2', author: 'me', text: 'Nice work team.', time: '11:05', msgStatus: 'read' },
+    ],
+  },
+  {
+    id: 'semi-sales',
+    type: 'general',
+    title: 'IT Sales - Table格式範例',
+    section: 'chats',
+    unread: true,
+    memberKeys: ['guanyu', 'kenji', 'yui', 'shinichi'],
+    messages: [
+      {
+        id: 'sc1', author: 'guanyu', time: '14:02',
+        text: 'Q3 wafer demand forecast by key account — please review before the QBR with the foundry.',
+        table: [
+          ['Customer', 'Node', 'Q3 Wafers', 'Q4 Wafers', 'Status'],
+          ['Apex Systems', 'N5', '12,000', '14,500', 'Confirmed'],
+          ['Nimbus AI', 'N3', '8,200', '11,000', 'Pending PO'],
+          ['Orion Devices', 'N7', '5,600', '5,400', 'Confirmed'],
+          ['Vega Mobile', 'N5', '9,800', '10,200', 'Forecast'],
+          ['Helix Auto', 'N12', '3,400', '3,900', 'Confirmed'],
+        ],
+      },
+      {
+        id: 'sc2', author: 'kenji', time: '14:08',
+        text: 'N3 capacity is tight for Q4 — Nimbus may need an allocation review before we commit the PO.',
+      },
+      {
+        id: 'sc3', author: 'me', time: '14:10', msgStatus: 'read',
+        text: 'Here is the current N3 line utilization snapshot:',
+        table: [
+          ['Line', 'Utilization'],
+          ['Fab 18 P1', '94%'],
+          ['Fab 18 P2', '88%'],
+        ],
+      },
+      {
+        id: 'sc4', author: 'yui', time: '14:15',
+        text: 'Yield on N3 P2 climbed to 71% last week, so we should free up a bit of capacity for Nimbus.',
+        reactions: [{ emoji: '🎉', count: 3 }],
+      },
+      {
+        id: 'sc5', author: 'guanyu', time: '14:22',
+        text: 'Weekly wafer starts by product × week (WW22–WW27, all nodes) — full view for capacity planning:',
+        table: [
+          ['Product', 'Node', 'WW22 Plan', 'WW22 Act', 'WW23 Plan', 'WW23 Act', 'WW24 Plan', 'WW24 Act', 'WW25 Plan', 'WW25 Act', 'WW26 Plan', 'WW26 Act', 'WW27 Plan', 'Cum Plan', 'Cum Act', 'Δ', 'Yield%', 'Die/Wfr', 'Good Die', 'Scrap', 'On Hold', 'Rework', 'Priority', 'PM', 'Customer', 'Ship Wk', 'Rev $K', 'ASP', 'Margin%', 'Risk'],
+          ['APX-V3', 'N5', '800', '812', '820', '805', '830', '831', '840', '829', '850', '–', '860', '5000', '4807', '-193', '92%', '320', '259K', '18', '0', '5', 'High', 'Kenji', 'Apex', 'WW29', '4,128', '$15.9', '38%', 'Low'],
+          ['NIM-A1', 'N3', '600', '590', '620', '614', '640', '–', '650', '–', '660', '–', '670', '3840', '1818', '-282', '71%', '280', '128K', '42', '12', '8', 'Critical', 'Yui', 'Nimbus', 'WW30', '2,899', '$22.6', '41%', 'High'],
+          ['ORI-7X', 'N7', '400', '402', '410', '408', '420', '419', '430', '427', '440', '–', '450', '2550', '2083', '-47', '88%', '410', '183K', '9', '0', '0', 'Normal', 'Shinichi', 'Orion', 'WW28', '3,294', '$18.0', '36%', 'Low'],
+          ['VGA-M2', 'N5', '700', '695', '710', '708', '720', '715', '730', '–', '740', '–', '750', '4350', '2844', '-156', '90%', '350', '256K', '14', '4', '2', 'High', 'Kenji', 'Vega', 'WW29', '4,608', '$18.0', '39%', 'Med'],
+          ['HLX-A12', 'N12', '300', '305', '310', '311', '315', '314', '320', '319', '325', '–', '330', '1900', '1574', '+24', '95%', '520', '149K', '4', '0', '0', 'Normal', 'Guanyu', 'Helix', 'WW27', '2,682', '$18.0', '34%', 'Low'],
+          ['APX-V4', 'N5', '200', '198', '210', '207', '220', '219', '230', '–', '240', '–', '250', '1350', '831', '-19', '91%', '318', '264K', '7', '0', '2', 'High', 'Kenji', 'Apex', 'WW30', '1,056', '$16.0', '37%', 'Low'],
+          ['NIM-B2', 'N3', '150', '148', '160', '–', '170', '–', '180', '–', '190', '–', '200', '1050', '296', '-6', '70%', '275', '206K', '10', '2', '0', 'Critical', 'Yui', 'Nimbus', 'WW31', '740', '$22.0', '40%', 'High'],
+          ['ORI-9X', 'N7', '250', '252', '260', '258', '270', '269', '280', '279', '290', '–', '300', '1650', '1307', '+8', '87%', '405', '231K', '6', '0', '1', 'Normal', 'Shinichi', 'Orion', 'WW29', '2,358', '$18.1', '35%', 'Low'],
+          ['VGA-M3', 'N5', '350', '346', '360', '357', '370', '368', '380', '–', '390', '–', '400', '2250', '1439', '-21', '89%', '345', '311K', '11', '1', '3', 'High', 'Kenji', 'Vega', 'WW30', '2,592', '$18.0', '38%', 'Med'],
+          ['HLX-B6', 'N12', '180', '182', '185', '184', '190', '191', '195', '194', '200', '–', '205', '1155', '944', '+6', '94%', '515', '178K', '3', '0', '0', 'Normal', 'Guanyu', 'Helix', 'WW28', '1,692', '$18.0', '33%', 'Low'],
+          ['SXR-10', 'N3', '100', '98', '110', '–', '120', '–', '130', '–', '140', '–', '150', '750', '196', '-6', '68%', '260', '133K', '15', '5', '4', 'Critical', 'Yui', 'Nimbus', 'WW32', '534', '$22.5', '42%', 'High'],
+          ['MTX-V1', 'N7', '220', '221', '230', '228', '240', '239', '250', '249', '260', '–', '270', '1470', '1156', '+7', '86%', '400', '192K', '5', '0', '0', 'Normal', 'Shinichi', 'Orion', 'WW29', '1,920', '$18.0', '35%', 'Low'],
+          ['PHX-A5', 'N5', '430', '428', '440', '437', '450', '449', '460', '–', '470', '–', '480', '2730', '1762', '-14', '91%', '330', '266K', '9', '2', '1', 'High', 'Kenji', 'Apex', 'WW30', '2,838', '$15.9', '38%', 'Low'],
+          ['QNT-C3', 'N3', '80', '78', '90', '–', '100', '–', '110', '–', '120', '–', '130', '630', '156', '-6', '69%', '270', '108K', '12', '3', '2', 'Critical', 'Yui', 'Nimbus', 'WW32', '432', '$22.0', '41%', 'High'],
+          ['RVX-D7', 'N7', '160', '161', '170', '169', '180', '179', '190', '189', '200', '–', '210', '1110', '867', '+8', '88%', '415', '149K', '4', '0', '0', 'Normal', 'Shinichi', 'Orion', 'WW29', '1,490', '$18.0', '36%', 'Low'],
+          ['STR-E9', 'N5', '560', '554', '570', '565', '580', '577', '590', '–', '600', '–', '610', '3510', '2253', '-27', '90%', '340', '204K', '16', '3', '2', 'High', 'Kenji', 'Vega', 'WW30', '3,672', '$18.0', '39%', 'Med'],
+          ['TRX-F2', 'N12', '140', '142', '145', '144', '148', '149', '150', '150', '155', '–', '160', '898', '728', '+5', '96%', '530', '140K', '2', '0', '0', 'Normal', 'Guanyu', 'Helix', 'WW27', '1,260', '$18.0', '34%', 'Low'],
+          ['ULT-G4', 'N3', '120', '118', '130', '–', '140', '–', '150', '–', '160', '–', '170', '870', '236', '-6', '72%', '285', '170K', '8', '1', '0', 'Critical', 'Yui', 'Nimbus', 'WW31', '612', '$22.3', '41%', 'High'],
+          ['VRX-H8', 'N7', '190', '191', '200', '198', '210', '209', '220', '219', '230', '–', '240', '1290', '1006', '+8', '87%', '408', '159K', '5', '0', '1', 'Normal', 'Shinichi', 'Orion', 'WW29', '1,590', '$18.0', '35%', 'Low'],
+          ['WVE-I6', 'N5', '480', '475', '490', '486', '500', '497', '510', '–', '520', '–', '530', '3030', '1955', '-22', '91%', '325', '289K', '13', '2', '1', 'High', 'Kenji', 'Apex', 'WW30', '3,204', '$15.9', '37%', 'Low'],
+          ['XPR-J3', 'N3', '90', '88', '100', '–', '110', '–', '120', '–', '130', '–', '140', '690', '176', '-6', '70%', '275', '123K', '10', '2', '2', 'Critical', 'Yui', 'Nimbus', 'WW32', '493', '$22.0', '40%', 'High'],
+        ],
+      },
     ],
   },
   {
@@ -1067,11 +1138,15 @@ function MessageBubble({
     : null
 
   // Bubble (shared) — text + images + reactions
+  // max-w-full (not w-fit) so the bubble never exceeds the column width; hugging
+  // for short messages comes from the column's items-start/items-end (shrink-to-
+  // fit), NOT fit-content — fit-content pulls a wide table's max-content and
+  // overflows. min-w-0 lets it shrink below content so the table scrolls inside.
   const bubble = (
-    <div className="relative min-w-0">
+    <div className="relative max-w-full min-w-0">
       <ReactionBar onOpenThread={() => onOpenThread(message)} mine={mine} room={room} hideReplyInThread={isInThread} />
       <div
-        className={`rounded-xl p-3 text-body ${mine ? 'text-foreground' : 'bg-muted text-foreground'}`}
+        className={`rounded-xl p-3 text-body max-w-full min-w-0 ${mine ? 'text-foreground' : 'bg-muted text-foreground'}`}
         style={mine ? { backgroundColor: '#EBEEFF' } : undefined}
       >
         <p className="whitespace-pre-wrap break-words">{message.text}</p>
@@ -1083,11 +1158,51 @@ function MessageBubble({
                 src={src}
                 alt=""
                 className="rounded-lg object-cover"
-                style={{ maxWidth: '100%', maxHeight: 280 }}
+                style={{ width: 200, maxWidth: '100%', aspectRatio: '3 / 2' }}
               />
             ))}
           </div>
         )}
+        {message.table && message.table.length > 0 && (() => {
+          const cols = message.table[0].length
+          const single = cols === 1
+          return (
+            <div
+              className="scroll-hover mt-2 overflow-auto rounded-lg border"
+              style={{ maxHeight: 320, width: 'fit-content', maxWidth: '100%', borderColor: 'var(--color-neutral-4)', backgroundColor: 'white' }}
+            >
+              <table className="border-collapse" style={{ width: single ? '100%' : 'max-content' }}>
+                  <tbody>
+                    {message.table.map((row, ri) => (
+                      <tr key={ri}>
+                        {row.map((cell, ci) => (
+                          <td
+                            key={ci}
+                            className="border align-top"
+                            style={{
+                              borderColor: 'var(--color-neutral-4)',
+                              padding: '4px 8px',
+                              fontSize: 12,
+                              fontWeight: ri === 0 ? 600 : 400,
+                              lineHeight: '130%',
+                              minWidth: 24,
+                              height: 24,
+                              maxWidth: single ? undefined : 120,
+                              wordBreak: 'break-word',
+                              color: 'var(--color-foreground)',
+                              backgroundColor: 'white',
+                            }}
+                          >
+                            {cell}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+            </div>
+          )
+        })()}
         {message.reactions && message.reactions.length > 0 && (
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
             {message.reactions.map((r) => (
@@ -1181,8 +1296,8 @@ function MessageBubble({
     // bubble left edge ≥ 96px from region left; status icon right edge 20px from region right
     return (
       <div className="group/msg flex w-full justify-end" style={{ paddingLeft: 96, paddingRight: 20 }}>
-        <div className="flex items-end">
-          <div className="flex flex-col gap-1 min-w-0 items-end">
+        <div className="flex items-end min-w-0">
+          <div className="flex flex-1 flex-col gap-1 min-w-0 items-end">
             <div className="flex justify-end pr-1">
               <span style={{ fontSize: 12, fontWeight: 400, lineHeight: '130%', color: 'var(--color-neutral-7)' }}>{message.time}</span>
             </div>
@@ -1198,13 +1313,13 @@ function MessageBubble({
   // other: avatar at region left; bubble right edge ≤ region right − 96px
   return (
     <div className="group/msg flex w-full" style={{ paddingRight: 96 }}>
-      <div className="flex items-start gap-2 min-w-0">
+      <div className="flex items-start gap-2 min-w-0 flex-1">
         {author && (
           <div className="mt-0.5 shrink-0">
             <PersonAvatar person={author} size={32} />
           </div>
         )}
-        <div className="flex flex-col gap-1 min-w-0">
+        <div className="flex flex-1 flex-col gap-1 min-w-0 items-start">
           {author && (
             <div className="flex items-center gap-2">
               <span style={{ fontSize: 12, fontWeight: 400, lineHeight: '130%', color: 'var(--color-neutral-7)' }}>{author.name}</span>
@@ -1227,11 +1342,16 @@ function MessageArea({ room, onOpenThread, fullWidth }: { room: Room; onOpenThre
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [room.messages.length])
 
+  // Plain overflow div (not DS ScrollArea): Radix Viewport wraps children in a
+  // `display:table; min-width:100%` box that grows to a wide table's max-content,
+  // which defeats any percentage-based width cap on the bubble. A plain scroll
+  // container has a definite width (= its flex parent), so the min-w-0 flex chain
+  // caps each bubble and a wide table scrolls horizontally inside its own bubble.
   return (
-    <ScrollArea className="min-h-0 flex-1">
+    <div className="scroll-hover min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
       <div className="px-4 py-4">
         <div
-          className="mx-auto flex flex-col gap-3"
+          className="mx-auto flex flex-col gap-3 min-w-0"
           style={fullWidth ? undefined : { maxWidth: 960 }}
         >
           {room.messages.map((m) => (
@@ -1240,7 +1360,7 @@ function MessageArea({ room, onOpenThread, fullWidth }: { room: Room; onOpenThre
           <div ref={bottomRef} />
         </div>
       </div>
-    </ScrollArea>
+    </div>
   )
 }
 
@@ -1270,16 +1390,17 @@ function InputBox({ fullWidth, onSend }: { fullWidth: boolean; onSend: (text: st
 
   const hasValue = value.trim().length > 0
 
+  const btn24 = '!h-6 !w-6 !min-w-0 !p-0'
   const actionButtons = (
-    <div className="flex shrink-0 items-center gap-0.5">
-      <IconBtnSm icon={Type} label="Rich editor" />
-      <IconBtnSm icon={Smile} label="Emoji" />
-      <IconBtnSm icon={Plus} label="Attach files" />
+    <div className="flex shrink-0 items-center gap-2">
+      <IconBtnSm icon={Type} label="Rich editor" className={btn24} />
+      <IconBtnSm icon={Smile} label="Emoji" className={btn24} />
+      <IconBtnSm icon={Plus} label="Attach files" className={btn24} />
       <Separator orientation="vertical" className="mx-1 h-5" />
       <Tooltip>
         <TooltipTrigger asChild>
           {/* empty → text (no bg, dark stroke) initial state; has value → primary filled */}
-          <Button variant={hasValue ? 'primary' : 'text'} size="sm" iconOnly startIcon={Send} aria-label="Send" title="" onClick={send} />
+          <Button variant={hasValue ? 'primary' : 'text'} size="sm" iconOnly startIcon={Send} aria-label="Send" title="" onClick={send} className={btn24} />
         </TooltipTrigger>
         <TooltipContent>Send</TooltipContent>
       </Tooltip>
@@ -1291,7 +1412,7 @@ function InputBox({ fullWidth, onSend }: { fullWidth: boolean; onSend: (text: st
       {/* ON: full-width, 56px sides; OFF: max 880px centered, 56px sides when narrower */}
       <div className="mx-auto w-full" style={fullWidth ? undefined : { maxWidth: 880 }}>
         <div
-          className="rounded-xl border bg-canvas"
+          className="rounded-lg border bg-canvas"
           style={{
             paddingTop: 6, paddingBottom: 6, paddingLeft: 12, paddingRight: 8,
             maxHeight: 280, overflow: 'hidden',
@@ -1353,9 +1474,10 @@ function ThreadInputBox() {
     el.style.height = `${Math.min(el.scrollHeight, 120)}px`
   }, [value])
 
+  const hasValue = value.trim().length > 0
   return (
     <div className="bg-surface px-3 py-2 shrink-0">
-      <div className="rounded-xl border border-border bg-canvas px-3 py-2 focus-within:border-border-hover">
+      <div className="rounded-lg border border-border bg-canvas px-3 py-2 focus-within:border-border-hover">
         <Textarea
           ref={ref}
           rows={1}
@@ -1378,7 +1500,7 @@ function ThreadInputBox() {
           </label>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="primary" size="sm" iconOnly startIcon={Send} aria-label="Send reply" title="" disabled={!value.trim()} />
+              <Button variant={hasValue ? 'primary' : 'text'} size="sm" iconOnly startIcon={Send} aria-label="Send reply" title="" className="!h-6 !w-6 !min-w-0 !p-0" />
             </TooltipTrigger>
             <TooltipContent>Send</TooltipContent>
           </Tooltip>
