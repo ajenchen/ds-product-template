@@ -1169,7 +1169,7 @@ function MessageBubble({
           return (
             <div
               className="scroll-hover mt-2 overflow-auto rounded-lg border"
-              style={{ maxHeight: 320, borderColor: 'var(--color-neutral-4)', backgroundColor: 'white' }}
+              style={{ maxHeight: 320, width: 'fit-content', maxWidth: '100%', borderColor: 'var(--color-neutral-4)', backgroundColor: 'white' }}
             >
               <table className="border-collapse" style={{ width: single ? '100%' : 'max-content' }}>
                   <tbody>
