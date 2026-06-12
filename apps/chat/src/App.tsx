@@ -317,7 +317,7 @@ const INITIAL_ROOMS: Room[] = [
   {
     id: 'semi-sales',
     type: 'general',
-    title: 'IT Sales',
+    title: 'IT Sales - Table格式範例',
     section: 'chats',
     unread: true,
     memberKeys: ['guanyu', 'kenji', 'yui', 'shinichi'],
