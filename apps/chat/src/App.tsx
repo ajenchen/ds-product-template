@@ -1138,15 +1138,15 @@ function MessageBubble({
     : null
 
   // Bubble (shared) — text + images + reactions
-  // w-fit + max-w-full on the rounded-xl (not the outer wrapper) so the bubble
-  // hugs short content and caps wide tables at the flex-1 column width.
-  // The outer div stays unsized (just `relative` for ReactionBar) so that
-  // items-end / items-start on the column controls alignment correctly.
+  // max-w-full (not w-fit) so the bubble never exceeds the column width; hugging
+  // for short messages comes from the column's items-start/items-end (shrink-to-
+  // fit), NOT fit-content — fit-content pulls a wide table's max-content and
+  // overflows. min-w-0 lets it shrink below content so the table scrolls inside.
   const bubble = (
-    <div className="relative">
+    <div className="relative max-w-full min-w-0">
       <ReactionBar onOpenThread={() => onOpenThread(message)} mine={mine} room={room} hideReplyInThread={isInThread} />
       <div
-        className={`rounded-xl p-3 text-body w-fit max-w-full ${mine ? 'text-foreground' : 'bg-muted text-foreground'}`}
+        className={`rounded-xl p-3 text-body max-w-full min-w-0 ${mine ? 'text-foreground' : 'bg-muted text-foreground'}`}
         style={mine ? { backgroundColor: '#EBEEFF' } : undefined}
       >
         <p className="whitespace-pre-wrap break-words">{message.text}</p>
@@ -1319,7 +1319,7 @@ function MessageBubble({
             <PersonAvatar person={author} size={32} />
           </div>
         )}
-        <div className="flex flex-1 flex-col gap-1 min-w-0">
+        <div className="flex flex-1 flex-col gap-1 min-w-0 items-start">
           {author && (
             <div className="flex items-center gap-2">
               <span style={{ fontSize: 12, fontWeight: 400, lineHeight: '130%', color: 'var(--color-neutral-7)' }}>{author.name}</span>
@@ -1342,11 +1342,16 @@ function MessageArea({ room, onOpenThread, fullWidth }: { room: Room; onOpenThre
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [room.messages.length])
 
+  // Plain overflow div (not DS ScrollArea): Radix Viewport wraps children in a
+  // `display:table; min-width:100%` box that grows to a wide table's max-content,
+  // which defeats any percentage-based width cap on the bubble. A plain scroll
+  // container has a definite width (= its flex parent), so the min-w-0 flex chain
+  // caps each bubble and a wide table scrolls horizontally inside its own bubble.
   return (
-    <ScrollArea className="min-h-0 flex-1">
+    <div className="scroll-hover min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
       <div className="px-4 py-4">
         <div
-          className="mx-auto flex flex-col gap-3"
+          className="mx-auto flex flex-col gap-3 min-w-0"
           style={fullWidth ? undefined : { maxWidth: 960 }}
         >
           {room.messages.map((m) => (
@@ -1355,7 +1360,7 @@ function MessageArea({ room, onOpenThread, fullWidth }: { room: Room; onOpenThre
           <div ref={bottomRef} />
         </div>
       </div>
-    </ScrollArea>
+    </div>
   )
 }
 
