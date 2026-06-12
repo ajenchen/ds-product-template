@@ -317,7 +317,7 @@ const INITIAL_ROOMS: Room[] = [
   {
     id: 'semi-sales',
     type: 'general',
-    title: 'Semiconductor Sales 半導體業務團隊',
+    title: 'IC Sales On-Call 業務值班群',
     section: 'chats',
     unread: true,
     memberKeys: ['guanyu', 'kenji', 'yui', 'shinichi'],
@@ -351,6 +351,18 @@ const INITIAL_ROOMS: Room[] = [
         id: 'sc4', author: 'yui', time: '14:15',
         text: 'Yield on N3 P2 climbed to 71% last week, so we should free up a bit of capacity for Nimbus.',
         reactions: [{ emoji: '🎉', count: 3 }],
+      },
+      {
+        id: 'sc5', author: 'guanyu', time: '14:22',
+        text: 'Weekly wafer starts by product × week (WW22–WW27, all nodes) — full view for capacity planning:',
+        table: [
+          ['Product', 'Node', 'WW22 Plan', 'WW22 Act', 'WW23 Plan', 'WW23 Act', 'WW24 Plan', 'WW24 Act', 'WW25 Plan', 'WW25 Act', 'WW26 Plan', 'WW26 Act', 'WW27 Plan', 'Cum Plan', 'Cum Act', 'Δ', 'Yield%', 'Die/Wfr', 'Good Die', 'Scrap', 'On Hold', 'Rework', 'Priority', 'PM', 'Customer', 'Ship Wk', 'Rev $K', 'ASP', 'Margin%', 'Risk'],
+          ['APX-V3', 'N5', '800', '812', '820', '805', '830', '831', '840', '829', '850', '–', '860', '5000', '4807', '-193', '92%', '320', '259K', '18', '0', '5', 'High', 'Kenji', 'Apex', 'WW29', '4,128', '$15.9', '38%', 'Low'],
+          ['NIM-A1', 'N3', '600', '590', '620', '614', '640', '–', '650', '–', '660', '–', '670', '3840', '1818', '-282', '71%', '280', '128K', '42', '12', '8', 'Critical', 'Yui', 'Nimbus', 'WW30', '2,899', '$22.6', '41%', 'High'],
+          ['ORI-7X', 'N7', '400', '402', '410', '408', '420', '419', '430', '427', '440', '–', '450', '2550', '2083', '-47', '88%', '410', '183K', '9', '0', '0', 'Normal', 'Shinichi', 'Orion', 'WW28', '3,294', '$18.0', '36%', 'Low'],
+          ['VGA-M2', 'N5', '700', '695', '710', '708', '720', '715', '730', '–', '740', '–', '750', '4350', '2844', '-156', '90%', '350', '256K', '14', '4', '2', 'High', 'Kenji', 'Vega', 'WW29', '4,608', '$18.0', '39%', 'Med'],
+          ['HLX-A12', 'N12', '300', '305', '310', '311', '315', '314', '320', '319', '325', '–', '330', '1900', '1574', '+24', '95%', '520', '149K', '4', '0', '0', 'Normal', 'Guanyu', 'Helix', 'WW27', '2,682', '$18.0', '34%', 'Low'],
+        ],
       },
     ],
   },
@@ -1135,38 +1147,41 @@ function MessageBubble({
           const cols = message.table[0].length
           const single = cols === 1
           return (
-            <div
-              className="scroll-hover mt-2 overflow-auto rounded-lg border"
-              style={{ maxHeight: 320, borderColor: 'var(--color-neutral-4)' }}
-            >
-              <table className="border-collapse" style={{ width: single ? '100%' : 'max-content' }}>
-                <tbody>
-                  {message.table.map((row, ri) => (
-                    <tr key={ri}>
-                      {row.map((cell, ci) => (
-                        <td
-                          key={ci}
-                          className="border align-top"
-                          style={{
-                            borderColor: 'var(--color-neutral-4)',
-                            padding: '4px 8px',
-                            fontSize: 12,
-                            fontWeight: ri === 0 ? 600 : 400,
-                            lineHeight: '130%',
-                            minWidth: 24,
-                            height: 24,
-                            maxWidth: single ? undefined : 120,
-                            wordBreak: 'break-word',
-                            color: 'var(--color-foreground)',
-                          }}
-                        >
-                          {cell}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div style={{ display: 'inline-block', maxWidth: '100%', marginTop: 8 }}>
+              <div
+                className="scroll-hover overflow-auto rounded-lg border"
+                style={{ maxHeight: 320, borderColor: 'var(--color-neutral-4)', backgroundColor: 'white' }}
+              >
+                <table className="border-collapse" style={{ width: single ? '100%' : 'max-content' }}>
+                  <tbody>
+                    {message.table.map((row, ri) => (
+                      <tr key={ri}>
+                        {row.map((cell, ci) => (
+                          <td
+                            key={ci}
+                            className="border align-top"
+                            style={{
+                              borderColor: 'var(--color-neutral-4)',
+                              padding: '4px 8px',
+                              fontSize: 12,
+                              fontWeight: ri === 0 ? 600 : 400,
+                              lineHeight: '130%',
+                              minWidth: 24,
+                              height: 24,
+                              maxWidth: single ? undefined : 120,
+                              wordBreak: 'break-word',
+                              color: 'var(--color-foreground)',
+                              backgroundColor: 'white',
+                            }}
+                          >
+                            {cell}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )
         })()}
@@ -1354,7 +1369,7 @@ function InputBox({ fullWidth, onSend }: { fullWidth: boolean; onSend: (text: st
 
   const btn24 = '!h-6 !w-6 !min-w-0 !p-0'
   const actionButtons = (
-    <div className="flex shrink-0 items-center gap-0.5">
+    <div className="flex shrink-0 items-center gap-2">
       <IconBtnSm icon={Type} label="Rich editor" className={btn24} />
       <IconBtnSm icon={Smile} label="Emoji" className={btn24} />
       <IconBtnSm icon={Plus} label="Attach files" className={btn24} />
