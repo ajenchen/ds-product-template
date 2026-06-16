@@ -20,7 +20,7 @@
 //   3. 替換 DashboardPage 為真實業務 widgets(DataTable / Chart / Card 等 DS 元件)
 //   4. 替換 PageHeader rightSlot 的 primary action(若有)
 
-import { useState } from 'react'
+import { useState, type ReactElement } from 'react'
 import {
   AppShell,
   SidebarProvider,
@@ -97,9 +97,14 @@ function AppSidebar() {
 // 繞過 header-canonical 全部機械簽名 + 違反「消費 primitive 不 hand-craft」canonical;
 // 對齊 _demo-helpers.tsx PageHeader 同款消費形)──
 // SidebarTrigger 必有(primary-sidebar mode 的 menu toggle 入口,⌘B keyboard shortcut)
-// rightSlot 用 JSX.Element(非 React.ReactNode):workspace 內 app 自帶 @types/react 副本與
-// DS 套件 .d.ts 解析的 ReactNode 版本不相容(bigint 差異)— Element 兩邊皆可指派
-function PageHeader({ title, rightSlot }: { title: string; rightSlot?: JSX.Element }) {
+// rightSlot 型別用 ReactElement<any, any>(= 舊全域 JSX.Element 的去全域等價寫法):
+//   - 不用裸 JSX.Element:React 19 @types/react 移除「全域」JSX namespace → `JSX.Element` 在 fresh React19 install
+//     下 TS2503「Cannot find namespace 'JSX'」(本機 @types/react 19.2.15 仍含全域 shim → 源端 tsc 假陰性,
+//     只在 receiver 拿到無 shim 的 19.x fresh install 才炸;2026-06-12 bde81e7e 引入,brick 下游 receiver build + audit)
+//   - 不用裸 ReactElement:@types/react@19 預設參數由 any 改 unknown,`ReactElement<unknown>` 因 ReactPortal.children
+//     分支不可指派給 ReactNode(TS2322)→ 必顯式 <any, any>(JSX.Element 本就是 ReactElement<any, any>,語意不變)
+//   - 不用 ReactNode:workspace app 自帶 @types/react 副本與 DS .d.ts 的 ReactNode 版本 bigint 差異不相容
+function PageHeader({ title, rightSlot }: { title: string; rightSlot?: ReactElement<any, any> }) {
   return (
     <ChromeHeader className="bg-surface">
       <SidebarTrigger />
