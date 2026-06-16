@@ -22,7 +22,7 @@
   },
   "dependencies": {
     "@qijenchen/design-system": "^0.1.0-beta.65",
-    "@qijenchen/storybook-config": "^0.1.0-beta.65",
+    "@qijenchen/storybook-config": "^0.1.0-beta.67",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
