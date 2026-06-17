@@ -24,6 +24,8 @@ Icon?
 .vscode/
 .idea/
 .claude/settings.local.json
+# fork 治理 dispatcher/hook 跑時生的 telemetry log = runtime noise,非 deliverable(雲端真機測 2026-06-17 證實會生)
+.claude/logs/
 
 # Temp
 tmp/
