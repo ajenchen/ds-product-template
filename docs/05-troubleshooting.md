@@ -26,9 +26,9 @@
 
 | 症狀 | 修法 |
 |---|---|
-| `/design-system-audit` 等 skills 沒出現 | 在 Claude Code 跑 `/plugin marketplace add github:ajenchen/design-system` + `/plugin install design-system@qijenchen-ds` → 重啟 session |
-| DS hooks 沒 fire | 確認 DS plugin 已安裝；`npm run sync-all` 後重啟 Claude Code |
-| CLAUDE.md instructions 沒 load | 讀本 repo `CLAUDE.md` 的 Cross-load DS canonical step，並確認 `node_modules/@qijenchen/design-system/CLAUDE.md` 存在 |
+| 治理沒生效(AI 沒遵循設計紀律 / hook 沒擋違規)| 確認 `npm install` 完成(`node_modules/@qijenchen/design-system/ds-canonical/fork/manifest.json` 存在)→ 重啟 session。雲端首次 session 若還在自動裝,重開 session 即可。**不需 /plugin install**(C-prime committed-config)|
+| 設計紀律 preamble 沒注入 context | SessionStart hook 讀 npm-current preamble;`npm run sync-all` 拉最新 + 重啟 session 生效 |
+| skills slash command(`/prototype` 等)沒出現 | **正常**——skills 非 C-prime 自動送達(Claude Code 不認 node_modules + 專案級 enabledPlugins 靜默忽略 #62174)。治理核心靠注入 preamble + 機械 hook,不靠 skills。要 slash command 需自行 commit 進 `.claude/skills/` 或裝 plugin。 |
 
 ## Netlify deploy
 
