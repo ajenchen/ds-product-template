@@ -103,7 +103,7 @@ function NavBtn({
           aria-labelledby={labelId}
           onClick={onClick}
           overlayBadge={overlayBadge}
-          className={active ? '!bg-neutral-selected' : ''}
+          className={`!h-8 !w-8 !min-w-0 !p-0 ${active ? '!bg-neutral-selected' : ''}`}
         />
       </TooltipTrigger>
       {/* avoidCollisions=false forces right side always — prevents Radix from flipping to top */}
@@ -137,16 +137,18 @@ function IconBtnSm({
   label,
   onClick,
   className,
+  style,
 }: {
   icon: React.ComponentProps<typeof Button>['startIcon']
   label: string
   onClick?: () => void
   className?: string
+  style?: React.CSSProperties
 }) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Button variant="text" size="sm" iconOnly startIcon={icon} aria-label={label} title="" onClick={onClick} className={className} />
+        <Button variant="text" size="sm" iconOnly startIcon={icon} aria-label={label} title="" onClick={onClick} className={className} style={style} />
       </TooltipTrigger>
       <TooltipContent>{label}</TooltipContent>
     </Tooltip>
@@ -203,6 +205,33 @@ const PEOPLE: Record<string, Person> = {
 }
 
 const ME: Person = { name: 'Me 我', color: 'green', status: 'online', role: 'You', email: 'me@teachat.app', avatar: 'https://i.pravatar.cc/96?img=8' }
+
+const GENERATED_CHAT_TOPICS = [
+  'Marketing Sync', 'Design Review', 'Sourcing Updates', 'Logistics 物流', 'Customer Feedback',
+  'Roadmap Planning', 'QA Handoff', 'Packaging Vendors', 'Retail Partners', 'Finance Q&A',
+  'Brewing Lab 茶研室', 'Supply Chain', 'Event Planning', 'Onboarding Buddies', 'Tasting Notes 品評',
+  'Inventory Check', 'Cold Brew Project', 'Seasonal Blends', 'Export Compliance', 'App Bugs Triage',
+  'Storefront Refresh', 'Vendor Contracts', 'Tea Garden Visit', 'Packaging QA', 'Wholesale Orders',
+  'Loyalty Program', 'Social Media 社群', 'Photography Shoot', 'Newsletter Draft', 'Pop-up Store',
+  'Sample Requests', 'Origin Trip 產地行', 'Tariff Updates', 'Recipe Ideas', 'Café Partnerships',
+  'Sustainability 永續', 'Customer Support', 'Subscription Box', 'Holiday Promo', 'Year-End Review',
+]
+const GENERATED_PEOPLE_KEYS = Object.keys(PEOPLE)
+const GENERATED_CHAT_ROOMS: Room[] = GENERATED_CHAT_TOPICS.map((title, i) => {
+  const authorKey = GENERATED_PEOPLE_KEYS[i % GENERATED_PEOPLE_KEYS.length]
+  const unread = i % 3 === 0
+  return {
+    id: `gen-${i}`,
+    type: 'general',
+    title,
+    section: 'chats',
+    unread,
+    memberKeys: GENERATED_PEOPLE_KEYS.slice(0, 3),
+    messages: [
+      { id: `gen-${i}-m1`, author: authorKey, text: `Quick update on ${title.toLowerCase()} — let's sync this week.`, time: `${9 + (i % 8)}:0${i % 6}` },
+    ],
+  }
+})
 
 const INITIAL_ROOMS: Room[] = [
   {
@@ -391,6 +420,7 @@ const INITIAL_ROOMS: Room[] = [
     memberKeys: ['kenji', 'yui'],
     messages: [{ id: 'e1', author: 'kenji', text: 'PR merged. Closing the ticket.', time: '5/26' }],
   },
+  ...GENERATED_CHAT_ROOMS,
 ]
 
 const COMMON_EMOJI = ['👍', '❤️', '😂', '🎉']
@@ -537,7 +567,7 @@ function NavRail({ unreadCount, onOpenSettings }: { unreadCount: number; onOpenS
   const moreLabelId = useId()
 
   return (
-    <nav className="flex w-12 shrink-0 flex-col items-center border-r border-divider bg-surface py-2">
+    <nav className="flex w-12 shrink-0 flex-col items-center border-r border-divider bg-surface px-2 py-2">
       <div className="flex h-10 items-center justify-center">
         <Logo />
       </div>
@@ -549,7 +579,7 @@ function NavRail({ unreadCount, onOpenSettings }: { unreadCount: number; onOpenS
           label="Chat"
           active={tab === 'chat'}
           onClick={() => setTab('chat')}
-          overlayBadge={unreadCount > 0 ? <Badge variant="critical" count={unreadCount} max={99} /> : undefined}
+          overlayBadge={unreadCount > 0 ? <Badge variant="critical" count={unreadCount} max={99} className="!bg-[#EC540F]" /> : undefined}
         />
       </div>
       <div className="mt-auto flex flex-col items-center gap-1 py-1">
@@ -558,7 +588,7 @@ function NavRail({ unreadCount, onOpenSettings }: { unreadCount: number; onOpenS
           <Tooltip>
             <TooltipTrigger asChild>
               <DropdownMenuTrigger asChild>
-                <Button variant="text" size="md" iconOnly startIcon={MoreHorizontal} aria-labelledby={moreLabelId} />
+                <Button variant="text" size="md" iconOnly startIcon={MoreHorizontal} aria-labelledby={moreLabelId} className="!h-8 !w-8 !min-w-0 !p-0" />
               </DropdownMenuTrigger>
             </TooltipTrigger>
             <TooltipContent side="right" avoidCollisions={false}>More</TooltipContent>
@@ -605,13 +635,20 @@ function AddPopover() {
 
 function Section({ label, open, onToggle, trailing }: { label: string; open: boolean; onToggle: () => void; trailing?: React.ReactNode }) {
   return (
-    <div className="mt-2 flex items-center gap-1 px-1">
+    <div className="mt-2 flex items-center gap-1 p-1">
+      <IconBtnSm
+        icon={open ? ChevronDown : ChevronRight}
+        label={open ? 'Collapse' : 'Expand'}
+        onClick={onToggle}
+        className="!h-5 !w-5 !min-w-0 !p-0"
+        style={{ color: 'var(--color-neutral-7)' }}
+      />
       <button
         type="button"
         onClick={onToggle}
-        className="flex flex-1 items-center gap-1 rounded-md py-1 text-caption font-semibold text-fg-secondary hover:text-foreground"
+        className="flex-1 truncate text-left hover:text-foreground"
+        style={{ fontSize: 12, fontWeight: 500, lineHeight: '130%', color: 'var(--color-neutral-7)' }}
       >
-        {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         {label}
       </button>
       {trailing}
@@ -688,6 +725,14 @@ function RoomRow({
   const latestAuthor = latestMsg?.author === 'me' ? 'You' : (PEOPLE[latestMsg?.author]?.name.split(' ')[0] ?? '')
   const previewText = latestMsg ? `${latestAuthor}: ${latestMsg.text}` : ''
   const avatarSize = showPreview ? 32 : 20
+  const isUnread = room.unread && !isMuted
+  const titleStyle: React.CSSProperties = isUnread
+    ? { fontSize: 14, fontWeight: 700, lineHeight: '150%', color: 'var(--color-neutral-9)' }
+    : { fontSize: 14, fontWeight: 400, lineHeight: '150%', color: 'var(--color-neutral-8)' }
+  const timeStyle: React.CSSProperties = { fontSize: 12, fontWeight: 400, lineHeight: '130%', color: 'var(--color-neutral-7)' }
+  const subtitleStyle: React.CSSProperties = isUnread
+    ? { fontSize: 12, fontWeight: 400, lineHeight: '130%', color: 'var(--color-neutral-9)' }
+    : { fontSize: 12, fontWeight: 400, lineHeight: '130%', color: 'var(--color-neutral-8)' }
 
   return (
     <div
@@ -710,33 +755,27 @@ function RoomRow({
         <div className="min-w-0 flex-1">
           {/* Line 1: name (flex-1 truncate) + time (shrink-0, always visible) */}
           <div className="flex items-baseline gap-1">
-            <span
-              className="min-w-0 flex-1 truncate"
-              style={{ fontSize: 14, fontWeight: room.unread && !isMuted ? 600 : 400, color: 'var(--foreground)' }}
-            >
+            <span className="min-w-0 flex-1 truncate" style={titleStyle}>
               {room.title}
             </span>
-            <span className="shrink-0 text-fg-secondary group-hover:invisible" style={{ fontSize: 12 }}>
+            <span className="shrink-0 group-hover:invisible" style={timeStyle}>
               {latestMsg?.time ?? ''}
             </span>
           </div>
           {/* Line 2: preview (flex-1 truncate) + unread dot (shrink-0) */}
           <div className="flex items-center gap-1">
-            <p className="min-w-0 flex-1 truncate text-fg-secondary" style={{ fontSize: 12 }}>
+            <p className="min-w-0 flex-1 truncate" style={subtitleStyle}>
               {previewText}
             </p>
-            {room.unread && !isMuted && (
+            {isUnread && (
               <span className="shrink-0 group-hover:invisible">
-                <Badge dot variant="critical" />
+                <Badge dot variant="critical" className="!bg-[#EC540F]" />
               </span>
             )}
           </div>
         </div>
       ) : (
-        <span
-          className="min-w-0 flex-1 truncate"
-          style={{ fontSize: 14, fontWeight: room.unread && !isMuted ? 600 : 400, color: 'var(--foreground)' }}
-        >
+        <span className="min-w-0 flex-1 truncate" style={titleStyle}>
           {room.title}
         </span>
       )}
@@ -815,8 +854,8 @@ function ChatList({
 
   return (
     <aside className="relative flex shrink-0 flex-col bg-surface" style={{ width }}>
-      <header className="flex items-center border-b border-divider px-3 py-2">
-        <h2 className="flex-1 truncate font-semibold" style={{ fontSize: 16 }}>Chats</h2>
+      <header className="flex items-center border-b border-divider px-3" style={{ paddingTop: 10, paddingBottom: 10 }}>
+        <h2 className="flex-1 truncate" style={{ fontSize: 16, fontWeight: 500, lineHeight: '130%', color: 'var(--color-neutral-9)' }}>Chats</h2>
         <div className="flex items-center gap-2">
           <AddPopover />
           <ListBtn icon={Search} label="Search" />
@@ -840,7 +879,7 @@ function ChatList({
           ))}
           <Section
             label="Chats" open={openChats} onToggle={() => setOpenChats((v) => !v)}
-            trailing={<ListBtn icon={Plus} label="Add chat" />}
+            trailing={<IconBtnSm icon={Plus} label="Add chat" className="!h-6 !w-6 !min-w-0 !p-0" style={{ color: 'var(--color-neutral-7)' }} />}
           />
           {openChats && chats.map((r) => (
             <RoomRow
