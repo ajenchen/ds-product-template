@@ -28,7 +28,7 @@
 |---|---|
 | 治理沒生效(AI 沒遵循設計紀律 / hook 沒擋違規)| 確認 `npm install` 完成(`node_modules/@qijenchen/design-system/ds-canonical/fork/manifest.json` 存在)→ 重啟 session。雲端首次 session 若還在自動裝,重開 session 即可。**不需 /plugin install**(C-prime committed-config)|
 | 設計紀律 preamble 沒注入 context | SessionStart hook 讀 npm-current preamble;`npm run sync-all` 拉最新 + 重啟 session 生效 |
-| skills slash command(`/prototype` 等)沒出現 | **正常**——skills 非 C-prime 自動送達(Claude Code 不認 node_modules + 專案級 enabledPlugins 靜默忽略 #62174)。治理核心靠注入 preamble + 機械 hook,不靠 skills。要 slash command 需自行 commit 進 `.claude/skills/` 或裝 plugin。 |
+| skills slash command(`/prototype` 等)沒出現 | fork-relevant skills 已 committed 進 `.claude/skills/`,**正常應出現**。沒出現時:(a) 確認 `.claude/skills/prototype/SKILL.md` 存在(新 fork 隨模板帶;既有 fork 跑 `npm run sync-all`)(b) **重開 session**——Claude Code 在 session 開始前掃 skill,剛同步的需重啟一次才載入。(注:DS-author-only 治理 skill 如 `design-system-audit` / `knowledge-prune` 不送,沒出現屬正常。) |
 
 ## Netlify deploy
 

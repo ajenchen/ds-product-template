@@ -49,9 +49,17 @@ if (ok) {
     if (refresh.copied?.length) console.log(`   • 啟動器:${refresh.copied.join(' / ')}`)
     if (refresh.removed?.length) console.log(`   • 移除 obsolete plugin-era hook:${refresh.removed.join(' / ')}(防 brick:這些舊 hook 沒 plugin 會擋掉所有編輯)`)
     if (refresh.settingsMerged) console.log('   • settings.json hooks + permissions 已對齊 canonical(strip 舊 launcher + obsolete + append + union,未動你自有非治理 hook)。')
+    if (refresh.skills?.length) console.log(`   • skills(可叫用如 /${refresh.skills[0]}):${refresh.skills.join(' / ')}(複製進 .claude/skills/,下個 session 生效;未動你自有 skill)`)
+    if (refresh.commands?.length) console.log(`   • commands:${refresh.commands.join(' / ')}`)
+    if (refresh.agents?.length) console.log(`   • agents:${refresh.agents.join(' / ')}`)
   }
 
-  console.log('   👉 重啟 Claude Code session → committed hook 重讀 npm-current 治理生效。')
+  console.log('')
+  console.log('   ── 各軌生效時機(多數已即時/自動,不必盲目重啟整個 session)──')
+  console.log('   ✅ 機械強制 hook:已即時生效(dispatcher 每次觸發即重讀 npm-current,無需動作)')
+  console.log('   ✅ settings 接線:Claude Code file watcher 自動 hot-reload(無需動作;雲端或保險起見開新 session 最穩)')
+  console.log('   🟡 設計指引 preamble + skills:本 session 仍舊版 → 開新 session 自動最新,或現在跑 /clear 立即刷新(⚠️ /clear 會清空本對話 history)')
+  console.log('   👉 想立刻全套用最新指引:跑 /clear 或開新 session;只改 code 想繼續手上工作:機械強制已即時,不必動作')
   process.exit(0)
 }
 

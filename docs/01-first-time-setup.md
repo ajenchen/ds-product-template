@@ -29,7 +29,7 @@ claude
 
 - `npm run create-app test-app` creates `apps/test-app/`.
 - `cd apps/test-app && npm run dev` opens a styled Vite app.
-- 開 Claude Code session 後,AI context 含設計紀律(問它「有沒有 item-anatomy 的設計原則?」應答得出);叫它手刻 `<table>` 或硬寫 `gap-13` 會被官方 hook 擋。(注:`/prototype` 等 slash command **非** C-prime 自動送達——治理核心靠注入的 preamble + 機械 hook,不靠 skills;詳 CLAUDE.md。)
+- 開 Claude Code session 後,AI context 含設計紀律(問它「有沒有 item-anatomy 的設計原則?」應答得出);叫它手刻 `<table>` 或硬寫 `gap-13` 會被官方 hook 擋。(注:`/prototype` 等 fork-relevant slash command **已** committed 進 `.claude/skills/`,**session-1 可直接叫用**;DS-author-only 治理 skill 不送。詳 CLAUDE.md。)
 
 ## Next
 
