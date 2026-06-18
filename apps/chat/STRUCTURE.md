@@ -84,7 +84,7 @@ ChatList
   - DM 用 `GENERATED_DM_PEOPLE`（20 位全新不重複人物，每位 unique name/avatar/color）；這 20 位以 `g-xxx` key **`PEOPLE.forEach` 注入 PEOPLE map**，讓 conversation 內 `PEOPLE[message.author]` 能解析頭像 + 名字。Group 用 `GENERATED_GROUP_TOPICS`（20 個 unique 主題，與既有 room 名不撞）+ 既有 7 位成員輪替 3 位。
   - **排序自然錯開**：`GENERATED_RUNS` run-length pattern `dm5, grp3, dm3, grp4, dm6, grp2, dm2, grp5, dm4, grp6`（dm/group 各總和 20），交錯成不規則但可重現的順序（非簡單 odd/even）。
   - 每間室 `makeGeneratedMessages()` 產生 **20 則來回對話**（偶數 slot = 對方 / 奇數 slot = `me`，真 1↔1 back-and-forth）；`unread = n % 3 === 0`。名稱與 id 全程不重複。
-- **Avatar 狀態燈尺寸 spec（2026-06-18 confirmed v2）**：`StatusDot` 有 `size` prop（預設 8px）+ 永遠帶 `ring-1 ring-surface`（1px `bg/surface` 外框線）。`PersonAvatar` 有 `dotSize` prop（預設 8）往下傳。RoomRow（ChatList）一律傳 `dotSize={6}` → **6×6**；ConversationHeader / MessageArea 用預設 **8×8**。
+- **Avatar 狀態燈尺寸 spec（2026-06-18 confirmed v2）**：`StatusDot` 有 `size` prop（預設 8px）+ 永遠帶 `ring-1 ring-surface`（1px `bg/surface` 外框線）。`PersonAvatar` 有 `dotSize` prop（預設 8）往下傳。RoomRow（ChatList）依 `showPreview` 傳 `dotSize={showPreview ? 8 : 6}`（preview OFF → **6×6** / ON → **8×8**）；ConversationHeader / MessageArea 用預設 **8×8**。
 - **RoomRow hover/active 圓角**：`rounded-lg` 改為 `rounded-[4px]`，確保視覺上精確 4px（不依賴 DS `rounded-lg` token 映射）。
 
 ---

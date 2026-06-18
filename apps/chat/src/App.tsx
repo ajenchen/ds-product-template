@@ -817,7 +817,7 @@ function RoomRow({
       {isMuted ? (
         <MutedAvatar size={avatarSize} />
       ) : room.type === 'dm' && room.person ? (
-        <PersonAvatar person={room.person} size={avatarSize} dotSize={6} />
+        <PersonAvatar person={room.person} size={avatarSize} dotSize={showPreview ? 8 : 6} />
       ) : (
         <GroupAvatar size={avatarSize} />
       )}
