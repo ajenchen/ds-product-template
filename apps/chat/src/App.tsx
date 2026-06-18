@@ -217,20 +217,66 @@ const GENERATED_CHAT_TOPICS = [
   'Sustainability 永續', 'Customer Support', 'Subscription Box', 'Holiday Promo', 'Year-End Review',
 ]
 const GENERATED_PEOPLE_KEYS = Object.keys(PEOPLE)
+const GENERATED_MSG_LINES = [
+  "Quick update on this — let's sync this week.",
+  'Sounds good, I will take a look today.',
+  'Can we push the deadline by a day?',
+  'Yes, that works on my end.',
+  'Just sent over the latest file, please check.',
+  'Thanks! Reviewing now.',
+  'One thing to flag — the numbers shifted slightly.',
+  'Got it, will adjust the plan accordingly.',
+  'Should we loop in the rest of the team?',
+  "Let's keep it small for now.",
+  'I added some notes in the doc.',
+  'Looks great, no further comments from me.',
+  'Quick question — is this ready for review?',
+  'Almost there, give me an hour.',
+  'No rush, take your time.',
+  'Following up on this thread.',
+  "Apologies for the delay, here's the update.",
+  'Perfect, that resolves it.',
+  'Let me know if anything else is needed.',
+  'Closing this out — thanks everyone!',
+]
+function makeGeneratedMessages(roomId: string, authorKeys: string[]) {
+  return Array.from({ length: 20 }, (_, j) => ({
+    id: `${roomId}-m${j + 1}`,
+    author: j % 4 === 3 ? 'me' : authorKeys[j % authorKeys.length],
+    text: GENERATED_MSG_LINES[j % GENERATED_MSG_LINES.length],
+    time: `${9 + (j % 8)}:${String((j * 3) % 60).padStart(2, '0')}`,
+  }))
+}
 const GENERATED_CHAT_ROOMS: Room[] = GENERATED_CHAT_TOPICS.map((title, i) => {
-  const authorKey = GENERATED_PEOPLE_KEYS[i % GENERATED_PEOPLE_KEYS.length]
+  const isDm = i % 2 === 0
   const unread = i % 3 === 0
+  const id = `gen-${i}`
+  if (isDm) {
+    const personKey = GENERATED_PEOPLE_KEYS[i % GENERATED_PEOPLE_KEYS.length]
+    return {
+      id,
+      type: 'dm',
+      title: PEOPLE[personKey].name,
+      section: 'chats',
+      unread,
+      person: PEOPLE[personKey],
+      messages: makeGeneratedMessages(id, [personKey]),
+    } as Room
+  }
+  const memberKeys = [
+    GENERATED_PEOPLE_KEYS[i % GENERATED_PEOPLE_KEYS.length],
+    GENERATED_PEOPLE_KEYS[(i + 1) % GENERATED_PEOPLE_KEYS.length],
+    GENERATED_PEOPLE_KEYS[(i + 2) % GENERATED_PEOPLE_KEYS.length],
+  ]
   return {
-    id: `gen-${i}`,
+    id,
     type: 'general',
     title,
     section: 'chats',
     unread,
-    memberKeys: GENERATED_PEOPLE_KEYS.slice(0, 3),
-    messages: [
-      { id: `gen-${i}-m1`, author: authorKey, text: `Quick update on ${title.toLowerCase()} — let's sync this week.`, time: `${9 + (i % 8)}:0${i % 6}` },
-    ],
-  }
+    memberKeys,
+    messages: makeGeneratedMessages(id, memberKeys),
+  } as Room
 })
 
 const INITIAL_ROOMS: Room[] = [
@@ -426,18 +472,19 @@ const INITIAL_ROOMS: Room[] = [
 const COMMON_EMOJI = ['👍', '❤️', '😂', '🎉']
 
 // ── Status dot ────────────────────────────────────────────────────────────────
-function StatusDot({ status }: { status: Presence }) {
+function StatusDot({ status, size = 8 }: { status: Presence; size?: number }) {
   const base = 'flex items-center justify-center rounded-full ring-1 ring-surface'
-  if (status === 'online') return <span className={`${base} bg-green-500`} style={{ width: 10, height: 10 }} />
-  if (status === 'busy') return <span className={`${base} bg-red-500`} style={{ width: 10, height: 10 }} />
+  const dim = { width: size, height: size }
+  if (status === 'online') return <span className={`${base} bg-green-500`} style={dim} />
+  if (status === 'busy') return <span className={`${base} bg-red-500`} style={dim} />
   if (status === 'away') {
     return (
-      <span className={`${base} bg-yellow-400`} style={{ width: 12, height: 12 }}>
-        <Clock size={8} className="text-white" strokeWidth={2.5} />
+      <span className={`${base} bg-yellow-400`} style={dim}>
+        <Clock size={Math.round(size * 0.67)} className="text-white" strokeWidth={2.5} />
       </span>
     )
   }
-  return <span className={`${base} border-2 border-neutral-400 bg-transparent`} style={{ width: 10, height: 10 }} />
+  return <span className={`${base} border-2 border-neutral-400 bg-transparent`} style={dim} />
 }
 
 // ── Avatar helpers ────────────────────────────────────────────────────────────
@@ -457,12 +504,12 @@ function makeProfileCard(p: Person) {
   )
 }
 
-function PersonAvatar({ person, size = 32 }: { person: Person; size?: number }) {
+function PersonAvatar({ person, size = 32, dotSize = 8 }: { person: Person; size?: number; dotSize?: number }) {
   return (
     <div className="relative inline-flex shrink-0">
       <Avatar src={person.avatar} alt={person.name} color={person.color} size={size} hoverCard={makeProfileCard(person)} />
       <span className="absolute -bottom-0.5 -right-0.5 z-10">
-        <StatusDot status={person.status} />
+        <StatusDot status={person.status} size={dotSize} />
       </span>
     </div>
   )
@@ -736,7 +783,7 @@ function RoomRow({
 
   return (
     <div
-      className={`group relative flex cursor-pointer items-center gap-2 rounded-lg px-2 ${
+      className={`group relative flex cursor-pointer items-center gap-2 rounded-[4px] px-2 ${
         showPreview ? 'py-2' : 'py-1.5'
       } ${active ? 'bg-neutral-selected' : 'hover:bg-neutral-hover'}`}
       onClick={() => onSelect(room.id)}
@@ -745,7 +792,7 @@ function RoomRow({
       {isMuted ? (
         <MutedAvatar size={avatarSize} />
       ) : room.type === 'dm' && room.person ? (
-        <PersonAvatar person={room.person} size={avatarSize} />
+        <PersonAvatar person={room.person} size={avatarSize} dotSize={showPreview ? 8 : 6} />
       ) : (
         <GroupAvatar size={avatarSize} />
       )}
@@ -1243,7 +1290,7 @@ function MessageBubble({
           )
         })()}
         {message.reactions && message.reactions.length > 0 && (
-          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          <div className="mt-2 flex flex-wrap items-center gap-1">
             {message.reactions.map((r) => (
               <button
                 key={r.emoji}
@@ -1251,15 +1298,15 @@ function MessageBubble({
                 className="flex h-6 items-center gap-1 rounded-full border bg-surface px-2 py-1 hover:bg-neutral-hover"
                 style={{ borderColor: 'var(--color-neutral-5)' }}
               >
-                <span style={{ fontSize: 16 }}>{r.emoji}</span>
-                <span style={{ color: 'var(--color-neutral-8)' }}>{r.count}</span>
+                <span style={{ fontSize: 16, lineHeight: 1 }}>{r.emoji}</span>
+                <span style={{ fontSize: 12, fontWeight: 400, lineHeight: '130%', color: 'var(--color-neutral-8)' }}>{r.count}</span>
               </button>
             ))}
             <button
               type="button"
               aria-label="Add reaction"
-              className="flex h-6 items-center rounded-full border bg-surface px-2 py-1 text-fg-secondary hover:bg-neutral-hover hover:text-foreground"
-              style={{ borderColor: 'var(--color-neutral-5)' }}
+              className="flex h-6 items-center rounded-full border bg-surface px-2 py-1 hover:bg-neutral-hover"
+              style={{ borderColor: 'var(--color-neutral-5)', color: 'var(--color-neutral-7)' }}
             >
               <SmilePlus size={16} />
             </button>
@@ -1280,11 +1327,12 @@ function MessageBubble({
       )}
       <button
         type="button"
-        className="flex items-center gap-1 text-info-text hover:underline"
+        className="flex items-center gap-1 hover:underline"
+        style={{ color: 'var(--color-primary)' }}
         onClick={() => onOpenThread(message)}
       >
-        <MessagesSquare size={16} />
-        <span style={{ fontSize: 12, fontWeight: 500, lineHeight: '130%' }}>{replyCount} replies</span>
+        <MessagesSquare size={16} style={{ color: 'var(--color-primary)' }} />
+        <span style={{ fontSize: 12, fontWeight: 500, lineHeight: '130%', color: 'var(--color-primary)' }}>{replyCount} replies</span>
         {latestReplyTime && (
           <span style={{ fontSize: 12, fontWeight: 400, lineHeight: '130%', color: 'var(--color-neutral-7)', marginLeft: 4 }}>{latestReplyTime}</span>
         )}

@@ -80,7 +80,15 @@ ChatList
 - **Header「Chats」spec（2026-06-18 confirmed）**：`header` 上下 padding 改 10px（`style={{ paddingTop:10, paddingBottom:10 }}`，取代原 `py-2`=8px）；標題 `fontSize:16 / fontWeight:500 / lineHeight:'130%' / color:var(--color-neutral-9)`。
 - **Section spec（2026-06-18 confirmed）**：容器 `p-1`=4px all sides + `gap-1`=4px（左 icon ↔ label ↔ trailing icon 各 4px）；外層 ChatList `px-2`=8px 提供 section 與列表邊界的左右間隔。左側展開/收起鈕 `IconBtnSm` + `!h-5 !w-5`=20×20（icon 16px，由 `size="sm"` 預設對齊），color `var(--color-neutral-7)`。右側 trailing 鈕（"Add chat" Plus）改用 `IconBtnSm` + `!h-6 !w-6`=24×24，同色 neutral-7（原為 `ListBtn`，已換成可控尺寸的 `IconBtnSm`）。Section name 字級 `fontSize:12 / fontWeight:500 / lineHeight:'130%' / color:var(--color-neutral-7)`。`IconBtnSm` 新增 `style` prop 支援顏色 override。
 - **RoomRow 已讀/未讀 spec（2026-06-18 confirmed）**：未讀（`room.unread && !isMuted`）標題 `14px/700/150%/neutral-9`；已讀標題 `14px/400/150%/neutral-8`。時間資訊（`showPreview` ON 才顯示）一律 `12px/400/130%/neutral-7`。副標題（preview text）未讀 `12px/400/130%/neutral-9`，已讀 `12px/400/130%/neutral-8`。未讀 dot badge `<Badge dot variant="critical">` 加 `className="!bg-[#EC540F]"` 對齊 `bg/notification`。
-- **Chats section 測試資料**：`GENERATED_CHAT_ROOMS`（App.tsx，`INITIAL_ROOMS` 之前宣告）用 40 個 topic 字串 cycling `PEOPLE` 產生 40 間 `type:'general'` room（id `gen-0`…`gen-39`），`unread = i % 3 === 0`，併入 `INITIAL_ROOMS` 的 `chats` section 尾端，供 RoomRow 大量捲動測試。
+- **Chats section 測試資料（2026-06-18 updated）**：`GENERATED_CHAT_ROOMS`（App.tsx，`INITIAL_ROOMS` 之前宣告）用 40 個 topic 字串產生 40 間 room（id `gen-0`…`gen-39`），偶數 index = `type:'dm'`（1 on 1，cycling `PEOPLE`）、奇數 index = `type:'general'`（多人，3 位 `memberKeys`）→ 50/50 split；每間室用 `makeGeneratedMessages()` 產生 **20 則** message（cycling 20 句對話文案 + 每 4 則插入 1 則 `author:'me'`），`unread = i % 3 === 0`，併入 `INITIAL_ROOMS` 的 `chats` section 尾端，供 RoomRow 大量捲動測試。
+- **Avatar 狀態燈尺寸 spec（2026-06-18 confirmed）**：`StatusDot` 新增 `size` prop（預設 8px，全域沿用於 ConversationHeader / MessageArea 的 32px 頭像）；`PersonAvatar` 新增 `dotSize` prop（預設 8）往下傳。RoomRow 依 `showPreview` 傳 `dotSize={showPreview ? 8 : 6}`（OFF=6×6 / ON=8×8）。
+- **RoomRow hover/active 圓角**：`rounded-lg` 改為 `rounded-[4px]`，確保視覺上精確 4px（不依賴 DS `rounded-lg` token 映射）。
+
+---
+
+## 2a. Avatar 狀態燈（`function StatusDot` / `function PersonAvatar`）
+
+`StatusDot({ status, size = 8 })`：online/busy/offline 圓點直徑 = `size`；away 圖示（`Clock`）依 `size * 0.67` 等比縮放。`PersonAvatar({ person, size = 32, dotSize = 8 })` 把 `dotSize` 轉傳給 `StatusDot`，與頭像本體 `size`（決定頭像直徑）互相獨立 — 各呼叫點可分別控制頭像大小與狀態燈大小。
 
 ---
 
@@ -101,14 +109,14 @@ Conversation
 │       ├── 我的: bg #EBEEFF、時間在上、status icon (16×16) 在泡泡外；泡泡四角圓角 rounded-xl (12px)
 │       │      邊距(MessageArea layout): bubble 左緣撐滿時距 region 左緣 96px(paddingLeft)；status icon 距 region 右緣 20px(paddingRight)；bubble↔icon 4px gap；無 icon 仍保留 16px 寬
 │       ├── 對方: 頭像 + 名稱 + 時間 (sm/400 12px/130% neutral-7)；名稱與時間間距 8px；名稱+時間列與泡泡間距 4px；bubble 右緣撐滿跨行時距 region 右緣 96px(paddingRight)，短訊息自然內縮
-│       ├── 泡泡 padding p-3 (12px)；reactions emoji 按鈕一律 h-6/px-2/py-1/border neutral-5（含 Add reaction 按鈕，樣式一致）/emoji 16px/count neutral-8
+│       ├── 泡泡 padding p-3 (12px)；reactions emoji 按鈕一律 h-6(24px)/px-2(8px)/py-1(4px)/border neutral-5/按鈕間 gap-1(4px)；emoji 16px、count `12px/400/130%/neutral-8`；Add reaction 按鈕同尺寸/padding，icon `SmilePlus 16px` color neutral-7（2026-06-18 confirmed）
 │       ├── inline image: width 200px(max-w 100%) / aspect 3:2 / rounded-lg
 │       ├── table(`Message.table?: string[][]`): cell font 12px/400/130%(首列 600) + padding 4px 8px；白底(td + wrapper backgroundColor white)；多欄每欄 max-w 120 / min-w 24；單欄 max-w 隨 bubble 自適應 / min-w 24；列 min-h 24 自動長高；max-h 320px；wrapper `width:fit-content; max-width:100%` → 少欄位自然 hug 內容(不被長文字撐開的 bubble 拉寬)，多欄寬表 cap 在 bubble 寬度上限內並水平捲動；超出寬/高出現 hover-only scrollbar(`.scroll-hover`，globals.css)
 │       │      泡泡寬度: bubble 用 `max-w-full min-w-0`(非 w-fit — fit-content 會抓 table max-content 而溢出畫面)；hug 由 column 的 items-start(對方)/items-end(我的) shrink-to-fit 提供
 │       │      MessageArea 用普通 scroll div(`overflow-y-auto overflow-x-hidden` + `.scroll-hover`)取代 DS ScrollArea：Radix Viewport 內包 `display:table; min-width:100%` 會被寬 table max-content 撐大、bubble 的 % cap 失效；普通 div 寬度確定(= flex parent)，min-w-0 flex chain 才能 cap bubble + 讓 table 在泡泡內水平捲動
 │       ├── ReactionBar (z-[8]；hover 顯示；hideReplyInThread 時不顯示 Reply in thread 按鈕)
 │       ├── ReactionMoreMenu  (mine vs other 不同選單；`side="bottom" sideOffset={8}`，保留 Radix 碰撞避讓)
-│       └── Thread replies link: shrink-0 L-connector 24×12（border-l/b 1px neutral-4 + rounded-bl-[8px] 圓角，橫線落在 24×24 視覺垂直中點 y=12）+ MessagesSquare 16 + "N replies" sm/500 + 最新回覆時間 sm/400 neutral-7
+│       └── Thread replies link: shrink-0 L-connector 24×12（border-l/b 1px neutral-4 + rounded-bl-[8px] 圓角，橫線落在 24×24 視覺垂直中點 y=12）+ MessagesSquare 16 + "N replies" sm/500 + 最新回覆時間 sm/400 neutral-7；icon 與 "N replies" 文字顏色皆為 `var(--color-primary)`（= primary-6，2026-06-18 confirmed）；最新回覆時間維持 neutral-7
 ├── InputBox                  (接受 `fullWidth` + `onSend` prop。左右外側距欄位邊緣 56px；OFF=max 880px 置中，視窗窄於 880px 時仍保持 56px。單行：textarea + buttons 同排；多行：textarea 全寬在上，buttons 獨立在下。外框 padding top/bottom 6px / left 12px / right 8px；整個輸入方塊 max-height 280px（textarea clamp 232）；圓角 rounded-lg(8px)；輸入後外框轉 primary-hover 藍框；按鈕一律 24×24(`!h-6 !w-6 !min-w-0 !p-0`)，按鈕間距 8px(`gap-2`，同套用於 ThreadInputBox)；Send 按鈕無值時 text variant(無底深線)、有值時 primary。外層 pt-2=8px / pb-4=16px)
 └── ThreadPanel               寬 320~720，可拉寬（ResizeHandle line 1px neutral-4）
     ├── 父訊息（MessageBubble isInThread，下方無 "N replies" 分隔線）+ 回覆訊息（MessageBubble isInThread，ReactionBar 無 Reply in thread）
