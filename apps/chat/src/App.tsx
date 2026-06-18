@@ -206,17 +206,40 @@ const PEOPLE: Record<string, Person> = {
 
 const ME: Person = { name: 'Me 我', color: 'green', status: 'online', role: 'You', email: 'me@teachat.app', avatar: 'https://i.pravatar.cc/96?img=8' }
 
-const GENERATED_CHAT_TOPICS = [
+// 20 unique 1-on-1 DM partners. Registered into PEOPLE below so message author
+// lookups (PEOPLE[author]) resolve name + avatar in the conversation view.
+const GENERATED_DM_PEOPLE: { key: string; person: Person }[] = [
+  { key: 'g-rei', person: { name: 'Aoki Rei 青木玲', color: 'blue', status: 'online', role: 'Account Exec', email: 'rei@teachat.app', avatar: 'https://i.pravatar.cc/96?img=25' } },
+  { key: 'g-marco', person: { name: 'Marco Bianchi', color: 'green', status: 'away', role: 'Logistics Lead', email: 'marco@teachat.app', avatar: 'https://i.pravatar.cc/96?img=15' } },
+  { key: 'g-mei', person: { name: 'Zhao Mei 趙美', color: 'magenta', status: 'busy', role: 'Buyer', email: 'mei@teachat.app', avatar: 'https://i.pravatar.cc/96?img=24' } },
+  { key: 'g-tom', person: { name: 'Tom Becker', color: 'indigo', status: 'online', role: 'Sales Eng', email: 'tom@teachat.app', avatar: 'https://i.pravatar.cc/96?img=51' } },
+  { key: 'g-hana', person: { name: 'Sato Hana 佐藤花', color: 'purple', status: 'offline', role: 'Coordinator', email: 'hana@teachat.app', avatar: 'https://i.pravatar.cc/96?img=44' } },
+  { key: 'g-leo', person: { name: 'Leo Fernandez', color: 'turquoise', status: 'online', role: 'Analyst', email: 'leo@teachat.app', avatar: 'https://i.pravatar.cc/96?img=52' } },
+  { key: 'g-jing', person: { name: 'Wu Jing 吳靜', color: 'red', status: 'away', role: 'Ops', email: 'jing@teachat.app', avatar: 'https://i.pravatar.cc/96?img=45' } },
+  { key: 'g-erik', person: { name: 'Erik Lund', color: 'blue', status: 'online', role: 'Vendor Mgr', email: 'erik@teachat.app', avatar: 'https://i.pravatar.cc/96?img=53' } },
+  { key: 'g-yuki', person: { name: 'Kimura Yuki 木村雪', color: 'green', status: 'busy', role: 'Designer', email: 'yuki@teachat.app', avatar: 'https://i.pravatar.cc/96?img=26' } },
+  { key: 'g-priya', person: { name: 'Priya Nair', color: 'purple', status: 'online', role: 'PM', email: 'priya@teachat.app', avatar: 'https://i.pravatar.cc/96?img=27' } },
+  { key: 'g-chen', person: { name: 'Chen Wei 陳偉', color: 'indigo', status: 'away', role: 'Engineer', email: 'chenwei@teachat.app', avatar: 'https://i.pravatar.cc/96?img=54' } },
+  { key: 'g-sara', person: { name: 'Sara Olsen', color: 'magenta', status: 'online', role: 'Marketing', email: 'sara@teachat.app', avatar: 'https://i.pravatar.cc/96?img=28' } },
+  { key: 'g-ken', person: { name: 'Yamada Ken 山田健', color: 'turquoise', status: 'offline', role: 'Support', email: 'yamada@teachat.app', avatar: 'https://i.pravatar.cc/96?img=55' } },
+  { key: 'g-nina', person: { name: 'Nina Costa', color: 'red', status: 'busy', role: 'Finance', email: 'nina@teachat.app', avatar: 'https://i.pravatar.cc/96?img=29' } },
+  { key: 'g-feng', person: { name: 'Li Feng 李峰', color: 'blue', status: 'online', role: 'Sourcing', email: 'lifeng@teachat.app', avatar: 'https://i.pravatar.cc/96?img=56' } },
+  { key: 'g-omar', person: { name: 'Omar Haddad', color: 'green', status: 'away', role: 'Retail', email: 'omar@teachat.app', avatar: 'https://i.pravatar.cc/96?img=57' } },
+  { key: 'g-aiko', person: { name: 'Mori Aiko 森愛子', color: 'purple', status: 'online', role: 'QA', email: 'aiko@teachat.app', avatar: 'https://i.pravatar.cc/96?img=30' } },
+  { key: 'g-paul', person: { name: 'Paul Meyer', color: 'indigo', status: 'busy', role: 'Data', email: 'paul@teachat.app', avatar: 'https://i.pravatar.cc/96?img=58' } },
+  { key: 'g-xia', person: { name: 'Deng Xia 鄧霞', color: 'magenta', status: 'online', role: 'Brand', email: 'xia@teachat.app', avatar: 'https://i.pravatar.cc/96?img=31' } },
+  { key: 'g-ivan', person: { name: 'Ivan Petrov', color: 'turquoise', status: 'offline', role: 'Warehouse', email: 'ivan@teachat.app', avatar: 'https://i.pravatar.cc/96?img=59' } },
+]
+GENERATED_DM_PEOPLE.forEach(({ key, person }) => { PEOPLE[key] = person })
+
+// 20 unique group chat topics (no overlap with INITIAL_ROOMS' existing names).
+const GENERATED_GROUP_TOPICS = [
   'Marketing Sync', 'Design Review', 'Sourcing Updates', 'Logistics 物流', 'Customer Feedback',
   'Roadmap Planning', 'QA Handoff', 'Packaging Vendors', 'Retail Partners', 'Finance Q&A',
-  'Brewing Lab 茶研室', 'Supply Chain', 'Event Planning', 'Onboarding Buddies', 'Tasting Notes 品評',
-  'Inventory Check', 'Cold Brew Project', 'Seasonal Blends', 'Export Compliance', 'App Bugs Triage',
-  'Storefront Refresh', 'Vendor Contracts', 'Tea Garden Visit', 'Packaging QA', 'Wholesale Orders',
-  'Loyalty Program', 'Social Media 社群', 'Photography Shoot', 'Newsletter Draft', 'Pop-up Store',
-  'Sample Requests', 'Origin Trip 產地行', 'Tariff Updates', 'Recipe Ideas', 'Café Partnerships',
-  'Sustainability 永續', 'Customer Support', 'Subscription Box', 'Holiday Promo', 'Year-End Review',
+  'Brewing Lab 茶研室', 'Supply Chain', 'Event Planning', 'Tasting Notes 品評', 'Inventory Check',
+  'Cold Brew Project', 'Seasonal Blends', 'Export Compliance', 'Storefront Refresh', 'Wholesale Orders',
 ]
-const GENERATED_PEOPLE_KEYS = Object.keys(PEOPLE)
+const GENERATED_GROUP_MEMBERS = ['shinichi', 'ai', 'ran', 'guanyu', 'yating', 'kenji', 'yui']
 const GENERATED_MSG_LINES = [
   "Quick update on this — let's sync this week.",
   'Sounds good, I will take a look today.',
@@ -239,45 +262,47 @@ const GENERATED_MSG_LINES = [
   'Let me know if anything else is needed.',
   'Closing this out — thanks everyone!',
 ]
-function makeGeneratedMessages(roomId: string, authorKeys: string[]) {
+// 20 alternating back-and-forth messages: even slots = other party, odd = me.
+function makeGeneratedMessages(roomId: string, speakers: string[]) {
   return Array.from({ length: 20 }, (_, j) => ({
     id: `${roomId}-m${j + 1}`,
-    author: j % 4 === 3 ? 'me' : authorKeys[j % authorKeys.length],
+    author: j % 2 === 1 ? 'me' : speakers[Math.floor(j / 2) % speakers.length],
     text: GENERATED_MSG_LINES[j % GENERATED_MSG_LINES.length],
     time: `${9 + (j % 8)}:${String((j * 3) % 60).padStart(2, '0')}`,
   }))
 }
-const GENERATED_CHAT_ROOMS: Room[] = GENERATED_CHAT_TOPICS.map((title, i) => {
-  const isDm = i % 2 === 0
-  const unread = i % 3 === 0
-  const id = `gen-${i}`
-  if (isDm) {
-    const personKey = GENERATED_PEOPLE_KEYS[i % GENERATED_PEOPLE_KEYS.length]
-    return {
-      id,
-      type: 'dm',
-      title: PEOPLE[personKey].name,
-      section: 'chats',
-      unread,
-      person: PEOPLE[personKey],
-      messages: makeGeneratedMessages(id, [personKey]),
-    } as Room
+
+// Natural, irregular interleave of the two queues (run lengths sum to 20 each):
+// dm5, grp3, dm3, grp4, dm6, grp2, dm2, grp5, dm4, grp6
+const GENERATED_RUNS: [('dm' | 'group'), number][] = [
+  ['dm', 5], ['group', 3], ['dm', 3], ['group', 4], ['dm', 6],
+  ['group', 2], ['dm', 2], ['group', 5], ['dm', 4], ['group', 6],
+]
+const GENERATED_CHAT_ROOMS: Room[] = (() => {
+  const rooms: Room[] = []
+  let dmIdx = 0
+  let groupIdx = 0
+  let n = 0
+  for (const [kind, len] of GENERATED_RUNS) {
+    for (let k = 0; k < len; k++) {
+      const id = `gen-${n}`
+      const unread = n % 3 === 0
+      if (kind === 'dm') {
+        const { key, person } = GENERATED_DM_PEOPLE[dmIdx++]
+        rooms.push({ id, type: 'dm', title: person.name, section: 'chats', unread, person, messages: makeGeneratedMessages(id, [key]) })
+      } else {
+        const members = [
+          GENERATED_GROUP_MEMBERS[groupIdx % GENERATED_GROUP_MEMBERS.length],
+          GENERATED_GROUP_MEMBERS[(groupIdx + 1) % GENERATED_GROUP_MEMBERS.length],
+          GENERATED_GROUP_MEMBERS[(groupIdx + 2) % GENERATED_GROUP_MEMBERS.length],
+        ]
+        rooms.push({ id, type: 'general', title: GENERATED_GROUP_TOPICS[groupIdx++], section: 'chats', unread, memberKeys: members, messages: makeGeneratedMessages(id, members) })
+      }
+      n++
+    }
   }
-  const memberKeys = [
-    GENERATED_PEOPLE_KEYS[i % GENERATED_PEOPLE_KEYS.length],
-    GENERATED_PEOPLE_KEYS[(i + 1) % GENERATED_PEOPLE_KEYS.length],
-    GENERATED_PEOPLE_KEYS[(i + 2) % GENERATED_PEOPLE_KEYS.length],
-  ]
-  return {
-    id,
-    type: 'general',
-    title,
-    section: 'chats',
-    unread,
-    memberKeys,
-    messages: makeGeneratedMessages(id, memberKeys),
-  } as Room
-})
+  return rooms
+})()
 
 const INITIAL_ROOMS: Room[] = [
   {
@@ -792,7 +817,7 @@ function RoomRow({
       {isMuted ? (
         <MutedAvatar size={avatarSize} />
       ) : room.type === 'dm' && room.person ? (
-        <PersonAvatar person={room.person} size={avatarSize} dotSize={showPreview ? 8 : 6} />
+        <PersonAvatar person={room.person} size={avatarSize} dotSize={6} />
       ) : (
         <GroupAvatar size={avatarSize} />
       )}
