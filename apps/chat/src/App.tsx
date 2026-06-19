@@ -181,6 +181,9 @@ type Message = {
   threadMessages?: Message[]
   images?: string[]
   table?: string[][]
+  // Set on a main-area copy of a thread reply (when "Also send to chatroom" is on).
+  // Points at the thread's root message; drives the "replied to a thread" link.
+  repliedToThreadParentId?: string
 }
 
 type Room = {
@@ -822,34 +825,43 @@ function RoomRow({
         <GroupAvatar size={avatarSize} />
       )}
 
-      {/* Text content — min-w-0 flex-1 allows truncation without clipping right-side items */}
+      {/* Text content — min-w-0 flex-1 allows truncation without clipping right-side items.
+          group-hover:pr-6 reserves the 24px more-button footprint so text truncates at the
+          button's left edge instead of being overlapped by it. */}
       {showPreview ? (
-        <div className="min-w-0 flex-1">
-          {/* Line 1: name (flex-1 truncate) + time (shrink-0, always visible) */}
+        <div className="min-w-0 flex-1 group-hover:pr-6">
+          {/* Line 1: name (flex-1 truncate) + time (shrink-0; hidden on hover so name reclaims width) */}
           <div className="flex items-baseline gap-1">
             <span className="min-w-0 flex-1 truncate" style={titleStyle}>
               {room.title}
             </span>
-            <span className="shrink-0 group-hover:invisible" style={timeStyle}>
+            <span className="shrink-0 group-hover:hidden" style={timeStyle}>
               {latestMsg?.time ?? ''}
             </span>
           </div>
-          {/* Line 2: preview (flex-1 truncate) + unread dot (shrink-0) */}
+          {/* Line 2: preview (flex-1 truncate) + unread dot (shrink-0; hidden on hover) */}
           <div className="flex items-center gap-1">
             <p className="min-w-0 flex-1 truncate" style={subtitleStyle}>
               {previewText}
             </p>
             {isUnread && (
-              <span className="shrink-0 group-hover:invisible">
+              <span className="shrink-0 group-hover:hidden">
                 <Badge dot variant="critical" className="!bg-[#EC540F]" />
               </span>
             )}
           </div>
         </div>
       ) : (
-        <span className="min-w-0 flex-1 truncate" style={titleStyle}>
-          {room.title}
-        </span>
+        <div className="flex min-w-0 flex-1 items-center gap-1 group-hover:pr-6">
+          <span className="min-w-0 flex-1 truncate" style={titleStyle}>
+            {room.title}
+          </span>
+          {isUnread && (
+            <span className="shrink-0 group-hover:hidden">
+              <Badge dot variant="critical" className="!bg-[#EC540F]" />
+            </span>
+          )}
+        </div>
       )}
 
       {/* Hover: 24×24 more button, box right edge 12px from divider (right-1 = 4px inside the row's 8px right padding).
@@ -1365,6 +1377,33 @@ function MessageBubble({
     </div>
   ) : null
 
+  // "Replied to a thread" link — shown on a main-area copy of a thread reply
+  // ("Also send to chatroom"). Click opens that thread. Label truncates to one line.
+  const repliedParent = !isInThread && message.repliedToThreadParentId
+    ? room.messages.find((m) => m.id === message.repliedToThreadParentId) ?? null
+    : null
+  const repliedLink = repliedParent ? (
+    <div className={`mt-0.5 flex min-w-0 max-w-full items-center gap-1 ${mine ? 'justify-end' : ''}`}>
+      {!mine && (
+        <div
+          className="shrink-0 border-l border-b rounded-bl-[8px]"
+          style={{ width: 24, height: 12, borderColor: 'var(--color-neutral-4)' }}
+        />
+      )}
+      <button
+        type="button"
+        className="flex min-w-0 items-center gap-1 hover:underline"
+        style={{ color: 'var(--color-primary)' }}
+        onClick={() => onOpenThread(repliedParent)}
+      >
+        <MessagesSquare size={16} className="shrink-0" style={{ color: 'var(--color-primary)' }} />
+        <span className="truncate" style={{ fontSize: 12, fontWeight: 500, lineHeight: '130%', color: 'var(--color-primary)' }}>
+          replied to a thread: {repliedParent.text}
+        </span>
+      </button>
+    </div>
+  ) : null
+
   // ── Thread panel layout (narrow, simpler — no MessageArea margin rules) ──
   if (isInThread) {
     return (
@@ -1415,6 +1454,7 @@ function MessageBubble({
             </div>
             {bubble}
             {threadLink}
+            {repliedLink}
           </div>
           {statusCol}
         </div>
@@ -1440,6 +1480,7 @@ function MessageBubble({
           )}
           {bubble}
           {threadLink}
+          {repliedLink}
         </div>
       </div>
     </div>
@@ -1574,7 +1615,7 @@ function InputBox({ fullWidth, onSend }: { fullWidth: boolean; onSend: (text: st
 const THREAD_MIN = 320
 const THREAD_MAX = 720
 
-function ThreadInputBox() {
+function ThreadInputBox({ onSend }: { onSend: (text: string, alsoSend: boolean) => void }) {
   const [value, setValue] = useState('')
   const [alsoSend, setAlsoSend] = useState(true)
   const ref = useRef<HTMLTextAreaElement>(null)
@@ -1587,6 +1628,13 @@ function ThreadInputBox() {
   }, [value])
 
   const hasValue = value.trim().length > 0
+
+  function send() {
+    if (!value.trim()) return
+    onSend(value.trim(), alsoSend)
+    setValue('')
+  }
+
   return (
     <div className="bg-surface px-3 py-2 shrink-0">
       <div className="rounded-lg border border-border bg-canvas px-3 py-2 focus-within:border-border-hover">
@@ -1598,6 +1646,12 @@ function ThreadInputBox() {
           aria-label="Reply in thread"
           value={value}
           onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault()
+              send()
+            }
+          }}
           className="!resize-none !border-0 !px-0 !py-0 max-h-32"
         />
         <div className="mt-1.5 flex items-center gap-2">
@@ -1612,7 +1666,7 @@ function ThreadInputBox() {
           </label>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant={hasValue ? 'primary' : 'text'} size="sm" iconOnly startIcon={Send} aria-label="Send reply" title="" className="!h-6 !w-6 !min-w-0 !p-0" />
+              <Button variant={hasValue ? 'primary' : 'text'} size="sm" iconOnly startIcon={Send} aria-label="Send reply" title="" className="!h-6 !w-6 !min-w-0 !p-0" onClick={send} />
             </TooltipTrigger>
             <TooltipContent>Send</TooltipContent>
           </Tooltip>
@@ -1631,6 +1685,7 @@ function ThreadPanel({
   onExpand,
   onCollapse,
   onClose,
+  onSend,
 }: {
   message: Message
   room: Room
@@ -1640,6 +1695,7 @@ function ThreadPanel({
   onExpand: () => void
   onCollapse: () => void
   onClose: () => void
+  onSend: (text: string, alsoSend: boolean) => void
 }) {
   const [dragging, setDragging] = useState(false)
   const author = message.author === 'me' ? ME : (PEOPLE[message.author] ?? null)
@@ -1723,7 +1779,7 @@ function ThreadPanel({
         </div>
       </ScrollArea>
 
-      <ThreadInputBox />
+      <ThreadInputBox onSend={onSend} />
     </div>
   )
 }
@@ -1740,6 +1796,7 @@ function Conversation({
   fullWidth,
   onToggleFullWidth,
   onSend,
+  onThreadSend,
 }: {
   room: Room
   listOpen: boolean
@@ -1749,13 +1806,17 @@ function Conversation({
   fullWidth: boolean
   onToggleFullWidth: () => void
   onSend: (text: string) => void
+  onThreadSend: (parentId: string, text: string, alsoSend: boolean) => void
 }) {
-  const [threadMessage, setThreadMessage] = useState<Message | null>(null)
+  // Track the thread root by id (not a snapshot) so the panel re-reads live
+  // room state and shows newly sent replies immediately.
+  const [threadParentId, setThreadParentId] = useState<string | null>(null)
   const [threadExpanded, setThreadExpanded] = useState(false)
   const [threadWidth, setThreadWidth] = useState(480)
+  const threadMessage = threadParentId ? room.messages.find((m) => m.id === threadParentId) ?? null : null
 
   useEffect(() => {
-    setThreadMessage(null)
+    setThreadParentId(null)
     setThreadExpanded(false)
   }, [room.id])
 
@@ -1772,7 +1833,7 @@ function Conversation({
             isFullWidth={fullWidth}
             onToggleFullWidth={onToggleFullWidth}
           />
-          <MessageArea room={room} onOpenThread={setThreadMessage} fullWidth={fullWidth} />
+          <MessageArea room={room} onOpenThread={(m) => setThreadParentId(m.id)} fullWidth={fullWidth} />
           <InputBox key={room.id} fullWidth={fullWidth} onSend={onSend} />
         </div>
       )}
@@ -1785,7 +1846,8 @@ function Conversation({
           expanded={threadExpanded}
           onExpand={() => setThreadExpanded(true)}
           onCollapse={() => setThreadExpanded(false)}
-          onClose={() => { setThreadMessage(null); setThreadExpanded(false) }}
+          onClose={() => { setThreadParentId(null); setThreadExpanded(false) }}
+          onSend={(text, alsoSend) => onThreadSend(threadMessage.id, text, alsoSend)}
         />
       )}
     </section>
@@ -1832,6 +1894,26 @@ export default function App() {
     ))
   }
 
+  function handleThreadSend(parentId: string, text: string, alsoSend: boolean) {
+    const now = new Date()
+    const time = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
+    const baseId = `t-${Date.now()}`
+    // Reply shown inside the thread panel — normal bubble, no "replied to a thread" link.
+    const threadReply: Message = { id: baseId, author: 'me', text, time, msgStatus: 'sent' }
+    setRooms((prev) => prev.map((r) => {
+      if (r.id !== activeId) return r
+      let messages = r.messages.map((m) =>
+        m.id === parentId ? { ...m, threadMessages: [...(m.threadMessages ?? []), threadReply] } : m
+      )
+      if (alsoSend) {
+        // Main-area copy carries the back-link to its thread root.
+        const mainCopy: Message = { id: `${baseId}-main`, author: 'me', text, time, msgStatus: 'sent', repliedToThreadParentId: parentId }
+        messages = [...messages, mainCopy]
+      }
+      return { ...r, messages }
+    }))
+  }
+
   return (
     <TooltipProvider delayDuration={400} skipDelayDuration={200}>
       <div className="flex h-screen w-full overflow-hidden bg-canvas text-foreground">
@@ -1860,6 +1942,7 @@ export default function App() {
           isMuted={mutedIds.has(current.id)}
           onToggleMute={() => handleToggleMute(current.id)}
           onSend={handleSend}
+          onThreadSend={handleThreadSend}
         />
       </div>
       <SettingsModal

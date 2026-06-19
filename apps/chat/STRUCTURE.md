@@ -80,6 +80,7 @@ ChatList
 - **Header「Chats」spec（2026-06-18 confirmed）**：`header` 上下 padding 改 10px（`style={{ paddingTop:10, paddingBottom:10 }}`，取代原 `py-2`=8px）；標題 `fontSize:16 / fontWeight:500 / lineHeight:'130%' / color:var(--color-neutral-9)`。
 - **Section spec（2026-06-18 confirmed）**：容器 `p-1`=4px all sides + `gap-1`=4px（左 icon ↔ label ↔ trailing icon 各 4px）；外層 ChatList `px-2`=8px 提供 section 與列表邊界的左右間隔。左側展開/收起鈕 `IconBtnSm` + `!h-5 !w-5`=20×20（icon 16px，由 `size="sm"` 預設對齊），color `var(--color-neutral-7)`。右側 trailing 鈕（"Add chat" Plus）改用 `IconBtnSm` + `!h-6 !w-6`=24×24，同色 neutral-7（原為 `ListBtn`，已換成可控尺寸的 `IconBtnSm`）。Section name 字級 `fontSize:12 / fontWeight:500 / lineHeight:'130%' / color:var(--color-neutral-7)`。`IconBtnSm` 新增 `style` prop 支援顏色 override。
 - **RoomRow 已讀/未讀 spec（2026-06-18 confirmed）**：未讀（`room.unread && !isMuted`）標題 `14px/700/150%/neutral-9`；已讀標題 `14px/400/150%/neutral-8`。時間資訊（`showPreview` ON 才顯示）一律 `12px/400/130%/neutral-7`。副標題（preview text）未讀 `12px/400/130%/neutral-9`，已讀 `12px/400/130%/neutral-8`。未讀 dot badge `<Badge dot variant="critical">` 加 `className="!bg-[#EC540F]"` 對齊 `bg/notification`。
+- **RoomRow hover 截斷 spec（2026-06-19 confirmed）**：preview OFF 時未讀也在**標題後**顯示 `#EC540F` dot badge（與 ON 時的副標題尾端 dot 對齊）。hover 出現 RoomMoreMenu（24×24，絕對定位 `right-1`）時：文字容器加 `group-hover:pr-6`（保留 24px 按鈕 footprint）→ 標題/副標題截斷邊界移到 more 按鈕左緣、不被覆蓋；同時時間資訊與 dot badge 用 `group-hover:hidden`（非 `invisible`，display:none 才能讓文字回收寬度）隱藏。OFF 分支由原本單一 `<span>` 改為 `flex items-center gap-1` wrapper 容納 dot + 同套 hover 行為。
 - **Chats section 測試資料（2026-06-18 updated v2）**：`GENERATED_CHAT_ROOMS`（App.tsx，`INITIAL_ROOMS` 之前宣告，IIFE）產生 **40 間不重複** room（id `gen-0`…`gen-39`）：**20 間 `type:'dm'`（1 on 1）+ 20 間 `type:'general'`（多人）= 精確 50/50**。
   - DM 用 `GENERATED_DM_PEOPLE`（20 位全新不重複人物，每位 unique name/avatar/color）；這 20 位以 `g-xxx` key **`PEOPLE.forEach` 注入 PEOPLE map**，讓 conversation 內 `PEOPLE[message.author]` 能解析頭像 + 名字。Group 用 `GENERATED_GROUP_TOPICS`（20 個 unique 主題，與既有 room 名不撞）+ 既有 7 位成員輪替 3 位。
   - **排序自然錯開**：`GENERATED_RUNS` run-length pattern `dm5, grp3, dm3, grp4, dm6, grp2, dm2, grp5, dm4, grp6`（dm/group 各總和 20），交錯成不規則但可重現的順序（非簡單 odd/even）。
@@ -124,8 +125,13 @@ Conversation
 └── ThreadPanel               寬 320~720，可拉寬（ResizeHandle line 1px neutral-4）
     ├── 父訊息（MessageBubble isInThread，下方無 "N replies" 分隔線）+ 回覆訊息（MessageBubble isInThread，ReactionBar 無 Reply in thread）
     ├── `Message.threadMessages?: Message[]` 存實際回覆內容；replies count/latestReplyTime 由此衍生
-    └── ThreadInputBox        含 "Also send to chatroom" checkbox；圓角 rounded-lg(8px)；Send 按鈕 24×24 + 無值 text / 有值 primary（與主 InputBox 同規則）（ThreadPanel 容器無 `border-l`，視覺分隔線由 ResizeHandle 1px line 提供）
+    └── ThreadInputBox        含 "Also send to chatroom" checkbox；圓角 rounded-lg(8px)；Send 按鈕 24×24 + 無值 text / 有值 primary（與主 InputBox 同規則）（ThreadPanel 容器無 `border-l`，視覺分隔線由 ResizeHandle 1px line 提供）；**可發送**（Enter 或 Send 鈕，`onSend(text, alsoSend)` 上拋至 App `handleThreadSend`）
 ```
+
+> **Thread 發送 + "replied to a thread" link（2026-06-19 confirmed）**：
+> - State 改造：`Conversation` 用 `threadParentId`（非 message 快照）+ `room.messages.find(id)` 即時查 live 訊息，確保送出後 thread panel 立即顯示新回覆。`onOpenThread` 一律存 `m.id`。
+> - `handleThreadSend(parentId, text, alsoSend)`（App，SSOT of rooms state）：① 一定 append 一則 `threadReply` 到 `parent.threadMessages`（thread panel 內顯示，**普通 bubble、無 link**）。② 若 `alsoSend` 另 append 一則 `mainCopy` 到 `room.messages`（主區顯示），帶 `repliedToThreadParentId: parentId`。
+> - `Message.repliedToThreadParentId?: string`：標記「主區的 thread 回覆副本」。`MessageBubble`（`!isInThread` 時）偵測到 → 渲染 **repliedLink**：`MessagesSquare 16 + "replied to a thread: {母訊息 text}"`（單行 `truncate`），色 `var(--color-primary)`，點擊 `onOpenThread(parent)` 開該 thread。主區同時渲染 `threadLink`(有 threadMessages 時) 與 `repliedLink`(reply 副本時)，兩者互斥。
 
 > **ConversationHeader spec 驗證表（2026-06-09 confirmed）**：avatar 32×32(`size={32}`) · header `py-2`=上下 8px · 標題 `fontSize:16 / fontWeight:500 / lineHeight:'130%'` · icon-only 按鈕全 `size="sm"`=28×28 · 按鈕群 `gap-2`=8px · TeamsCallButton `px-1`=左右 4px + icon `size={18}` · RoomInfoButton `px-1`=4px + icon `size={18}` + badge `h-5`=20px / `pl:4 pr:4 pt:2 pb:2` / `fontSize:12 / lineHeight:'130%'` / `font-medium` · Edit 按鈕 `size="sm"`=28×28。
 
