@@ -1793,15 +1793,26 @@ function Conversation({
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-export default function App() {
+// Variant config — 讓 A/B usability test 在「不改基底預設行為」前提下調整初始狀態。
+// 所有欄位 optional,未傳 = 與 base story(apps-chat-chat--default)完全一致。
+export type ChatVariantConfig = {
+  /** 聊天列表初始是否顯示訊息預覽(本專案 A/B 差異點)。預設 true。 */
+  initialShowPreview?: boolean
+  /** 訊息區初始全寬 / 880px 置中。預設 true(全寬)。 */
+  initialFullWidth?: boolean
+  /** 聊天列表初始是否展開。預設 true。 */
+  initialListOpen?: boolean
+}
+
+export default function App({ config }: { config?: ChatVariantConfig } = {}) {
   const [rooms, setRooms] = useState<Room[]>(INITIAL_ROOMS)
   const [activeId, setActiveId] = useState<string>(INITIAL_ROOMS[0].id)
-  const [listOpen, setListOpen] = useState(true)
+  const [listOpen, setListOpen] = useState(config?.initialListOpen ?? true)
   const [listWidth, setListWidth] = useState(320)
-  const [showPreview, setShowPreview] = useState(true)
+  const [showPreview, setShowPreview] = useState(config?.initialShowPreview ?? true)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [mutedIds, setMutedIds] = useState<Set<string>>(new Set())
-  const [fullWidth, setFullWidth] = useState(true)
+  const [fullWidth, setFullWidth] = useState(config?.initialFullWidth ?? true)
   const [favOrder, setFavOrder] = useState<string[]>(
     INITIAL_ROOMS.filter((r) => r.section === 'favorites').map((r) => r.id)
   )
