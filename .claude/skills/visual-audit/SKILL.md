@@ -3,6 +3,8 @@ name: visual-audit
 description: Pixel-level visual audit for design-system components based on user-provided screenshots. Catches bug classes that code/spec audits cannot see — asymmetric padding / broken overlay positioning / gap-eaten-by-hover-bg / baseline misalignment / overflow indicator obscuring content / wrong zoom step / dark-mode token mismatch. Requires a screenshot to run; refuses to proceed on guesses. Invoke via /visual-audit when user says「視覺對齊不對」「排版有問題」「gap 好像錯了」「看起來歪了」or uploads a Storybook screenshot asking「這樣對嗎」,auto-invoked by `/design-system-audit` Phase 3 (post-fix visual verify) and `/component-quality-gate` Ship phase.
 ---
 
+> **⚠️ Fork 工具註記(build 自動加)**:本 skill 提到的 `scripts/*.mjs` 或非標準 `npm run <audit>` 是 **DS-author repo 的機械工具,未隨 fork 套件附帶**(Claude Code 不掃 node_modules,fork 也無這些 executor + dep)。你的 product fork 用本 skill 的**方法論**(human / AI judgment)+ 既有 committed governance hook 的機械強制即可;要 mechanical 腳本層(截圖 / CI gate)請自行設置對應工具,或把該檢查 PR 回 DS repo 跑。
+
 # Visual Audit — screenshot-based pixel-level 稽核
 
 ## 存在意義

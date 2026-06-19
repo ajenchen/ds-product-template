@@ -1,3 +1,4 @@
+> **⚠️ Fork 工具註記(build 自動加)**:本 skill 提到的 `scripts/*.mjs` 或非標準 `npm run <audit>` 是 **DS-author repo 的機械工具,未隨 fork 套件附帶**(Claude Code 不掃 node_modules,fork 也無這些 executor + dep)。你的 product fork 用本 skill 的**方法論**(human / AI judgment)+ 既有 committed governance hook 的機械強制即可;要 mechanical 腳本層(截圖 / CI gate)請自行設置對應工具,或把該檢查 PR 回 DS repo 跑。
 # Phase 3.5 Self-audit checklist(/prototype 用)
 
 對齊 CLAUDE.md `# 稽核 canonical` M6(stakeholder-visible 產出 → 強制進階模式)。比稿本質是「給 stakeholder 選視覺方向」,6 維任一沒 audit 好就 present = 比稿品質失準。

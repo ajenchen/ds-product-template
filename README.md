@@ -91,7 +91,7 @@ DS repo 任何 push main → fork repo 自動同步,不偏移。兩層都同步:
 npm run sync-all   # npm install @beta(內容層最新)+ 從 npm idempotent 刷新接線骨架
 ```
 
-`sync-all` 純 npm(不需 `claude plugin` 指令)。骨架刷新帶 `.github/no-governance-sync` opt-out、不 clobber 你自有的非治理 hook。改完 **restart Claude Code session** 才 apply。
+`sync-all` 純 npm(不需 `claude plugin` 指令)。骨架刷新帶 `.github/no-governance-sync` opt-out、不 clobber 你自有的非治理 hook。生效分軌(別盲目重啟):機械 hook 即時 / settings 自動 hot-reload / 設計指引 preamble + skills 跑 `/clear` 或下個 session(見 CLAUDE.md 三軌表)。
 
 ## Layout
 

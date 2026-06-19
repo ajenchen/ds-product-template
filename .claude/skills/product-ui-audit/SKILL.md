@@ -3,6 +3,8 @@ name: product-ui-audit
 description: Audit product / consumer UI code (非 design-system 本身) against DS usage discipline + mindset adherence. Catches element misuse / design principle violations / token leakage / geometry bugs / a11y gaps across 7 dimensions. Invoke via /product-ui-audit when user says「audit 這個 UI」「檢查 X feature 用對 DS 嗎」「這段 code 符合設計原則嗎」,or auto-invoked by /prototype Phase 3.5 gate.
 ---
 
+> **⚠️ Fork 工具註記(build 自動加)**:本 skill 提到的 `scripts/*.mjs` 或非標準 `npm run <audit>` 是 **DS-author repo 的機械工具,未隨 fork 套件附帶**(Claude Code 不掃 node_modules,fork 也無這些 executor + dep)。你的 product fork 用本 skill 的**方法論**(human / AI judgment)+ 既有 committed governance hook 的機械強制即可;要 mechanical 腳本層(截圖 / CI gate)請自行設置對應工具,或把該檢查 PR 回 DS repo 跑。
+
 # Product UI Audit Workflow
 
 Purpose: design-system-audit audits the **DS itself**(spec / cva / SSOT 三方漂移);product-ui-audit audits **consumer UI code**(不是 DS 本身,是 app / exploration / feature code — 即「consumer 用 DS 的地方」)。防止:

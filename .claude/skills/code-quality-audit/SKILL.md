@@ -3,6 +3,8 @@ name: code-quality-audit
 description: Clean code 量化稽核 — `any` 使用 / dead export / file size / long function / circular dep / magic number。補 `/design-system-audit` 只管「design canonical」的缺口。Invoke via /code-quality-audit scope=all(release / 季度)OR scope=changed(daily)OR scope=component:X(focused)。Auto-chain by `/design-system-audit --deep` Dim 27 + `/component-quality-gate` Ship phase + `/new-component` Phase 4.5。
 ---
 
+> **⚠️ Fork 工具註記(build 自動加)**:本 skill 提到的 `scripts/*.mjs` 或非標準 `npm run <audit>` 是 **DS-author repo 的機械工具,未隨 fork 套件附帶**(Claude Code 不掃 node_modules,fork 也無這些 executor + dep)。你的 product fork 用本 skill 的**方法論**(human / AI judgment)+ 既有 committed governance hook 的機械強制即可;要 mechanical 腳本層(截圖 / CI gate)請自行設置對應工具,或把該檢查 PR 回 DS repo 跑。
+
 # Code Quality Audit — Clean Code 量化稽核
 
 Scope:**tsx / ts code hygiene**,跟 design canonical 正交。

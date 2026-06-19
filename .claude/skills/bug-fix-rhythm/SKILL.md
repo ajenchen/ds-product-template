@@ -3,6 +3,8 @@ name: bug-fix-rhythm
 description: Batch-end-verify rhythm + parallel tool batch + user-listed N-rule MUST-ALL + claim runtime verify. Invoke when entering multi-fix session 或 user 列 numbered rules. Replaces M32(c)(d)(h1)(h2) sub-invariants(2026-05-12 split per Knowledge-Prune Checkpoint 2)。
 ---
 
+> **⚠️ Fork 工具註記(build 自動加)**:本 skill 提到的 `scripts/*.mjs` 或非標準 `npm run <audit>` 是 **DS-author repo 的機械工具,未隨 fork 套件附帶**(Claude Code 不掃 node_modules,fork 也無這些 executor + dep)。你的 product fork 用本 skill 的**方法論**(human / AI judgment)+ 既有 committed governance hook 的機械強制即可;要 mechanical 腳本層(截圖 / CI gate)請自行設置對應工具,或把該檢查 PR 回 DS repo 跑。
+
 # /bug-fix-rhythm — 多 fix session 的 rhythm canonical
 
 **目的**:當 session 有 ≥ 2 fixes(常見 visual bug session / user 列 N 條 numbered 規則),走 batch-end-verify rhythm,而非 per-fix verify cycle waste。**M32 split 後 (c)(d)(h1)(h2) 的 home**。

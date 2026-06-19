@@ -3,6 +3,8 @@ name: scan-similar-bugs
 description: Auto-invoke after fix commits — extracts root-cause anti-pattern, greps DS-wide for same pattern, runs visual verify, batches related fixes. Closes M10 mechanical gap. Invoke via /scan-similar-bugs.
 ---
 
+> **⚠️ Fork 工具註記(build 自動加)**:本 skill 提到的 `scripts/*.mjs` 或非標準 `npm run <audit>` 是 **DS-author repo 的機械工具,未隨 fork 套件附帶**(Claude Code 不掃 node_modules,fork 也無這些 executor + dep)。你的 product fork 用本 skill 的**方法論**(human / AI judgment)+ 既有 committed governance hook 的機械強制即可;要 mechanical 腳本層(截圖 / CI gate)請自行設置對應工具,或把該檢查 PR 回 DS repo 跑。
+
 # /scan-similar-bugs — Fix-time DS-wide Exhaustive Scan
 
 **目的**:任何 bug fix 提交後,**機械化掃 DS-wide 找同 pattern**,而非靠 model 記得 M10。
