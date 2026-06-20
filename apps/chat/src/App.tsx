@@ -830,22 +830,23 @@ function RoomRow({
           button's left edge instead of being overlapped by it. */}
       {showPreview ? (
         <div className="min-w-0 flex-1 group-hover:pr-6">
-          {/* Line 1: name (flex-1 truncate) + time (shrink-0; hidden on hover so name reclaims width) */}
+          {/* Line 1: name (flex-1 truncate) + time (shrink-0; invisible on hover — keeps its
+              box so row height is identical across initial/hover/clicked) */}
           <div className="flex items-baseline gap-1">
             <span className="min-w-0 flex-1 truncate" style={titleStyle}>
               {room.title}
             </span>
-            <span className="shrink-0 group-hover:hidden" style={timeStyle}>
+            <span className="shrink-0 group-hover:invisible" style={timeStyle}>
               {latestMsg?.time ?? ''}
             </span>
           </div>
-          {/* Line 2: preview (flex-1 truncate) + unread dot (shrink-0; hidden on hover) */}
+          {/* Line 2: preview (flex-1 truncate) + unread dot (shrink-0; invisible on hover) */}
           <div className="flex items-center gap-1">
             <p className="min-w-0 flex-1 truncate" style={subtitleStyle}>
               {previewText}
             </p>
             {isUnread && (
-              <span className="shrink-0 group-hover:hidden">
+              <span className="shrink-0 group-hover:invisible">
                 <Badge dot variant="critical" className="!bg-[#EC540F]" />
               </span>
             )}
@@ -857,7 +858,7 @@ function RoomRow({
             {room.title}
           </span>
           {isUnread && (
-            <span className="shrink-0 group-hover:hidden">
+            <span className="shrink-0 group-hover:invisible">
               <Badge dot variant="critical" className="!bg-[#EC540F]" />
             </span>
           )}
