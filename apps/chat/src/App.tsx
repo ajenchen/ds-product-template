@@ -1290,6 +1290,11 @@ function MessageBubble({
   const latestReplyTime = message.threadMessages?.length
     ? message.threadMessages[message.threadMessages.length - 1].time
     : null
+  // A main-area copy of a thread reply ("Also send to chatroom"). Its bubble gets a
+  // min-width so the "replied to a thread" link below always has room for the
+  // L-connector + icon + at least "…"; the link is width-capped to the bubble.
+  const isRepliedCopy = !isInThread && !!message.repliedToThreadParentId
+  const REPLIED_LINK_MIN_W = 120
 
   // Bubble (shared) — text + images + reactions
   // max-w-full (not w-fit) so the bubble never exceeds the column width; hugging
@@ -1297,7 +1302,7 @@ function MessageBubble({
   // fit), NOT fit-content — fit-content pulls a wide table's max-content and
   // overflows. min-w-0 lets it shrink below content so the table scrolls inside.
   const bubble = (
-    <div className="relative max-w-full min-w-0">
+    <div className="relative max-w-full min-w-0" style={isRepliedCopy ? { minWidth: REPLIED_LINK_MIN_W } : undefined}>
       <ReactionBar onOpenThread={() => onOpenThread(message)} mine={mine} room={room} hideReplyInThread={isInThread} />
       <div
         className={`rounded-xl p-3 text-body max-w-full min-w-0 ${mine ? 'text-foreground' : 'bg-muted text-foreground'}`}
@@ -1409,33 +1414,47 @@ function MessageBubble({
   ) : null
 
   // "Replied to a thread" link — shown on a main-area copy of a thread reply
-  // ("Also send to chatroom"). Click opens that thread. The "replied to a thread:"
-  // prefix never truncates (shrink-0); only the parent-message text truncates, and
-  // the row may grow wider than the bubble to fit the prefix. Color neutral-7.
-  const repliedParent = !isInThread && message.repliedToThreadParentId
+  // ("Also send to chatroom"). Click opens that thread. The link is width-capped to
+  // the bubble (w-0 min-w-full → contributes 0 to width, renders at bubble width):
+  // the L-connector + icon stay fixed (shrink-0) and the text truncates so the row
+  // never extends past the bubble's edge. Icon = primary; text = neutral-7.
+  const repliedParent = isRepliedCopy
     ? room.messages.find((m) => m.id === message.repliedToThreadParentId) ?? null
     : null
   const repliedLink = repliedParent ? (
-    <div className={`mt-0.5 flex min-w-0 max-w-full items-center gap-1 ${mine ? 'justify-end' : ''}`}>
+    <div className="mt-0.5 flex w-0 min-w-full items-center gap-1">
       <div
         className="shrink-0 border-l border-b rounded-bl-[8px]"
         style={{ width: 24, height: 12, borderColor: 'var(--color-neutral-4)' }}
       />
       <button
         type="button"
-        className="flex min-w-0 items-center gap-1 hover:underline"
+        className="flex min-w-0 flex-1 items-center gap-1 hover:underline"
         onClick={() => onOpenThread(repliedParent)}
       >
-        <MessagesSquare size={16} className="shrink-0" style={{ color: 'var(--color-neutral-7)' }} />
-        <span className="shrink-0 whitespace-nowrap" style={{ fontSize: 12, fontWeight: 500, lineHeight: '130%', color: 'var(--color-neutral-7)' }}>
-          replied to a thread:
-        </span>
+        <MessagesSquare size={16} className="shrink-0" style={{ color: 'var(--color-primary)' }} />
         <span className="min-w-0 truncate" style={{ fontSize: 12, fontWeight: 400, lineHeight: '130%', color: 'var(--color-neutral-7)' }}>
-          {repliedParent.text}
+          replied to a thread: {repliedParent.text}
         </span>
       </button>
     </div>
   ) : null
+
+  // Group bubble + repliedLink in a shrink-to-content column so the link's
+  // min-w-full resolves to the bubble's width (the bubble drives the width via its
+  // content / min-width; the link contributes 0). Result: link never exceeds the
+  // bubble edge, and a short bubble is widened by the bubble's minWidth.
+  const bubbleBlock = repliedLink ? (
+    <div className="inline-flex max-w-full flex-col gap-1" style={{ alignItems: mine ? 'flex-end' : 'flex-start' }}>
+      {bubble}
+      {repliedLink}
+    </div>
+  ) : (
+    <>
+      {bubble}
+      {threadLink}
+    </>
+  )
 
   // ── Thread panel layout (narrow, simpler — no MessageArea margin rules) ──
   if (isInThread) {
@@ -1485,9 +1504,7 @@ function MessageBubble({
             <div className="flex justify-end pr-1">
               <span style={{ fontSize: 12, fontWeight: 400, lineHeight: '130%', color: 'var(--color-neutral-7)' }}>{message.time}</span>
             </div>
-            {bubble}
-            {threadLink}
-            {repliedLink}
+            {bubbleBlock}
           </div>
           {statusCol}
         </div>
@@ -1511,9 +1528,7 @@ function MessageBubble({
               <span style={{ fontSize: 12, fontWeight: 400, lineHeight: '130%', color: 'var(--color-neutral-7)' }}>{message.time}</span>
             </div>
           )}
-          {bubble}
-          {threadLink}
-          {repliedLink}
+          {bubbleBlock}
         </div>
       </div>
     </div>
