@@ -11,7 +11,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Button, Input, ProgressBar, Notice } from '@qijenchen/design-system'
 import {
   ClipboardList, Target, Info, FileSpreadsheet, ClipboardCopy, RotateCcw, Check, ArrowRight,
-  GripVertical, ChevronDown, ChevronUp, CheckCircle2, XCircle, Mic, MicOff, Lock,
+  GripVertical, ChevronDown, ChevronUp, CheckCircle2, XCircle, Mic, MicOff, Lock, X, Maximize2,
 } from 'lucide-react'
 import App, { type ChatVariantConfig, type ChatAction } from '../App'
 
@@ -207,8 +207,8 @@ function FloatingStatus({ variant, rec }: { variant: string; rec: ThinkAloud }) 
           錄音中
         </span>
       ) : (
-        <span className="flex items-center gap-1 text-neutral-6" style={{ fontSize: 11 }}>
-          <MicOff size={11} />{rec.supported ? '未錄音' : '不支援'}
+        <span className="flex items-center gap-1" style={{ fontSize: 11, color: 'var(--color-warning-text)' }}>
+          <MicOff size={11} />{rec.supported ? '麥克風關閉中' : '不支援錄音'}
         </span>
       )}
       {rec.recording && rec.interim && (
@@ -473,7 +473,7 @@ function TranscriptBlock({ title, transcript }: { title: string; transcript: str
           )}
         </>
       ) : (
-        <p className="mt-1 text-neutral-6" style={{ fontSize: 12 }}>(無逐字稿:未授權麥克風或瀏覽器不支援語音轉文字)</p>
+        <p className="mt-1 text-neutral-6" style={{ fontSize: 12 }}>(無逐字稿:麥克風關閉中、未授權,或瀏覽器不支援語音轉文字)</p>
       )}
     </div>
   )
@@ -504,6 +504,46 @@ function ResultShell({ badge, children }: { badge: string; children: ReactNode }
         <Chip tone="info" className="mb-3">{badge}</Chip>
         {children}
       </div>
+    </div>
+  )
+}
+
+// ── 版本 UI 截圖(重新渲染該版本畫面;縮圖可點擊放大、可關閉)──────────────────
+function VersionPreview({ variant, config }: { variant: string; config: ChatVariantConfig }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="mt-2">
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        title="點擊放大檢視"
+        className="group relative block w-full overflow-hidden rounded-lg border border-neutral-4"
+        style={{ height: 200 }}
+      >
+        {/* 縮圖:重新渲染該版本 UI,縮放後裁切 */}
+        <div className="pointer-events-none origin-top-left" style={{ width: 1366, transform: 'scale(0.41)' }}>
+          <App config={config} />
+        </div>
+        <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition group-hover:bg-black/25">
+          <span className="flex items-center gap-1 rounded-full bg-black/65 px-3 py-1 text-white opacity-0 transition group-hover:opacity-100" style={{ fontSize: 12 }}>
+            <Maximize2 size={13} /> 點擊放大檢視版本 {variant}
+          </span>
+        </div>
+      </button>
+
+      {open && (
+        <div className="fixed inset-0 z-[2000] bg-canvas">
+          <App config={config} />
+          <Button
+            variant="primary"
+            startIcon={X}
+            onClick={() => setOpen(false)}
+            className="!fixed right-4 top-4 z-[2100] shadow-lg"
+          >
+            關閉預覽
+          </Button>
+        </div>
+      )}
     </div>
   )
 }
@@ -566,6 +606,9 @@ function SingleResultScreen({ project, run, tester, onReset }: { project: UTProj
 
       <p className="mt-5 text-neutral-9" style={{ fontSize: 13, fontWeight: 600 }}>任務 Summary</p>
       <OutcomeList outcomes={run.outcomes} />
+
+      <p className="mt-5 text-neutral-9" style={{ fontSize: 13, fontWeight: 600 }}>測試畫面截圖</p>
+      <VersionPreview variant={run.variant} config={project.variants[run.variant].config} />
 
       <TranscriptBlock title="放聲思考逐字稿" transcript={run.transcript} />
 
@@ -690,6 +733,8 @@ function CombinedResultScreen({ project, runs, tester, onReset }: { project: UTP
         <div key={r.variant}>
           <p className="mt-5 text-neutral-9" style={{ fontSize: 13, fontWeight: 600 }}>版本 {r.variant} 逐項</p>
           <OutcomeList outcomes={r.outcomes} />
+          <p className="mt-3 text-neutral-9" style={{ fontSize: 13, fontWeight: 600 }}>版本 {r.variant} 測試畫面截圖</p>
+          <VersionPreview variant={r.variant} config={project.variants[r.variant].config} />
           <TranscriptBlock title={`版本 ${r.variant} 放聲思考逐字稿`} transcript={r.transcript} />
         </div>
       ))}
