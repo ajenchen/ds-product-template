@@ -173,7 +173,7 @@ type Message = { id; author; text; time; status: MsgStatus; reactions[]; replies
 type Room    = { id; name; type; section: 'favorites' | 'chats'; unread; messages[] }
 ```
 
-Inline image（`message.images`）用 `placeholderPhoto(bg, fg, label)` 產生**自帶 SVG data URI**，不依賴第三方圖庫（之前用 `picsum.photos` 會因 ad-blocker/firewall/403 host_not_allowed 而變破圖；data URI 永遠載得出來）。
+Inline image（`message.images`）用 `UNSPLASH(id)` helper 產生 `images.unsplash.com` 直連圖片 URL（允許 hotlink、穩定，用 `?w=480&h=300&fit=crop` 控制尺寸）。之前用 `picsum.photos` 會因 ad-blocker/firewall/403 host_not_allowed 而變破圖。
 
 假資料常數：`PEOPLE`（柯南角色）· `ME` · `INITIAL_ROOMS`（含長訊息 + inline image 範例 + `semi-sales`「IT Sales - Table格式範例」chatroom 的 table 範例：少欄少列 forecast/utilization(hug 範例) + 30 欄 22 列 wafer starts 大表(達 max-h 320px 觸發 hover scrollbar + 水平捲動範例)）· `COMMON_EMOJI`。
 App 以 `useState(INITIAL_ROOMS)` 管理 rooms，`handleSend` 在 active room 尾端 append 新訊息。

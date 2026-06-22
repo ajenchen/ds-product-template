@@ -307,13 +307,10 @@ const GENERATED_CHAT_ROOMS: Room[] = (() => {
   return rooms
 })()
 
-// Self-contained SVG data URI — avoids depending on a third-party image CDN
-// (e.g. picsum.photos), which can be unreachable behind ad-blockers/firewalls
-// and renders as a broken image placeholder.
-function placeholderPhoto(bg: string, fg: string, label: string): string {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="480" height="300" viewBox="0 0 480 300"><rect width="480" height="300" fill="${bg}"/><circle cx="240" cy="120" r="50" fill="${fg}" opacity="0.5"/><text x="240" y="220" font-family="sans-serif" font-size="22" fill="${fg}" text-anchor="middle">${label}</text></svg>`
-  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`
-}
+// Inline message photos — Unsplash direct-image URLs (images.unsplash.com).
+// These allow hotlinking and are far more reliable than picsum.photos, which
+// rendered as broken placeholders. Sized via query params (w/h/fit=crop).
+const UNSPLASH = (id: string) => `https://images.unsplash.com/photo-${id}?w=480&h=300&fit=crop&q=80&auto=format`
 
 const INITIAL_ROOMS: Room[] = [
   {
@@ -343,7 +340,7 @@ const INITIAL_ROOMS: Room[] = [
       {
         id: 'm5', author: 'me', time: '09:21', msgStatus: 'read',
         text: 'Here are the moisture readings from the lab — batch #3 is definitely the standout.',
-        images: [placeholderPhoto('#8a9a5b', '#3f4a2b', 'Moisture sample A'), placeholderPhoto('#c9a063', '#6b4a2b', 'Moisture sample B')],
+        images: [UNSPLASH('1506744038136-46273834b3fb'), UNSPLASH('1469474968028-56623f02e42e')],
       },
       {
         id: 'm6', author: 'shinichi', time: '09:23',
@@ -377,7 +374,7 @@ const INITIAL_ROOMS: Room[] = [
       {
         id: 'g3', author: 'yating', time: '08:50',
         text: "I updated the tasting room layout — we now have a dedicated aroma station near the window for better lighting conditions. Here's how it looks:",
-        images: [placeholderPhoto('#5b7a9a', '#27384a', 'Tasting room layout')],
+        images: [UNSPLASH('1470071459604-3b5ec3a7fe05')],
       },
       {
         id: 'g4', author: 'kenji', time: '08:52',
