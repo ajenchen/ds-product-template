@@ -1,0 +1,36 @@
+{
+  "name": "@imethan0254/ut-model-a",
+  "version": "0.1.0",
+  "description": "Usability Testing 模型 A — 可重用的 A/B(/C) 易用性測試引擎:懸浮任務面板、依實際操作判定成敗、放聲思考逐字稿、A/B 綜合結論與 Excel/文字匯出。消費端只提供 UTProject(目標 + 任務 + 變體),引擎負責其餘全部。",
+  "type": "module",
+  "license": "MIT",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.build.json --noEmit"
+  },
+  "peerDependencies": {
+    "@qijenchen/design-system": ">=0.1.0-beta",
+    "lucide-react": ">=0.300.0",
+    "react": ">=18",
+    "react-dom": ">=18"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.7.0"
+  }
+}

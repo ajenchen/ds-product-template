@@ -5,7 +5,8 @@
   "description": "GitHub Template Repository — fork-and-go monorepo for product team apps consuming @qijenchen/design-system. Use 'Use this template' button OR clone + npm run create-app <product-name>.",
   "type": "module",
   "workspaces": [
-    "apps/*"
+    "apps/*",
+    "packages/*"
   ],
   "scripts": {
     "dev": "echo 'Pick an app: cd apps/<name> && npm run dev' && exit 1",
