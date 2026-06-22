@@ -554,6 +554,26 @@ function GroupAvatar({ size = 32 }: { size?: number }) {
   )
 }
 
+// 字母頭像 — 取名稱首字(大寫)+ 由名稱雜湊出的穩定顏色(各室不同色,不會每次 render 變動)。
+// 供 usability test 變體 C 用(多人聊天室);DM 不受影響。
+function hashString(s: string) {
+  let h = 0
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0
+  return Math.abs(h)
+}
+function InitialAvatar({ name, size = 32 }: { name: string; size?: number }) {
+  const letter = (name.trim()[0] ?? '#').toUpperCase()
+  const hue = hashString(name) % 360
+  return (
+    <div
+      className="flex shrink-0 items-center justify-center rounded-full font-semibold text-white"
+      style={{ width: size, height: size, backgroundColor: `hsl(${hue} 58% 50%)`, fontSize: Math.round(size * 0.45) }}
+    >
+      {letter}
+    </div>
+  )
+}
+
 function MutedAvatar({ size = 32 }: { size?: number }) {
   return (
     <div
@@ -786,6 +806,7 @@ function RoomRow({
   onToggleMute,
   onToggleFavorite,
   showPreview,
+  groupAvatarMode = 'icon',
 }: {
   room: Room
   active: boolean
@@ -795,6 +816,7 @@ function RoomRow({
   onToggleMute: (id: string) => void
   onToggleFavorite: (id: string) => void
   showPreview: boolean
+  groupAvatarMode?: 'icon' | 'initial'
 }) {
   const latestMsg = room.messages[room.messages.length - 1]
   const latestAuthor = latestMsg?.author === 'me' ? 'You' : (PEOPLE[latestMsg?.author]?.name.split(' ')[0] ?? '')
@@ -821,6 +843,8 @@ function RoomRow({
         <MutedAvatar size={avatarSize} />
       ) : room.type === 'dm' && room.person ? (
         <PersonAvatar person={room.person} size={avatarSize} dotSize={showPreview ? 8 : 6} />
+      ) : groupAvatarMode === 'initial' ? (
+        <InitialAvatar name={room.title} size={avatarSize} />
       ) : (
         <GroupAvatar size={avatarSize} />
       )}
@@ -899,6 +923,7 @@ function ChatList({
   favOrder,
   onToggleMute,
   onToggleFavorite,
+  groupAvatarMode = 'icon',
 }: {
   rooms: Room[]
   activeId: string
@@ -911,6 +936,7 @@ function ChatList({
   favOrder: string[]
   onToggleMute: (id: string) => void
   onToggleFavorite: (id: string) => void
+  groupAvatarMode?: 'icon' | 'initial'
 }) {
   const [openFav, setOpenFav] = useState(true)
   const [openChats, setOpenChats] = useState(true)
@@ -959,7 +985,7 @@ function ChatList({
               key={r.id} room={r} active={r.id === activeId}
               isMuted={mutedIds.has(r.id)} isFavorite={true}
               onSelect={onSelect} onToggleMute={onToggleMute} onToggleFavorite={onToggleFavorite}
-              showPreview={showPreview}
+              showPreview={showPreview} groupAvatarMode={groupAvatarMode}
             />
           ))}
           <Section
@@ -971,7 +997,7 @@ function ChatList({
               key={r.id} room={r} active={r.id === activeId}
               isMuted={mutedIds.has(r.id)} isFavorite={false}
               onSelect={onSelect} onToggleMute={onToggleMute} onToggleFavorite={onToggleFavorite}
-              showPreview={showPreview}
+              showPreview={showPreview} groupAvatarMode={groupAvatarMode}
             />
           ))}
         </div>
@@ -1098,6 +1124,7 @@ function ConversationHeader({
   onToggleMute,
   isFullWidth,
   onToggleFullWidth,
+  groupAvatarMode = 'icon',
 }: {
   room: Room
   listOpen: boolean
@@ -1106,6 +1133,7 @@ function ConversationHeader({
   onToggleMute: () => void
   isFullWidth: boolean
   onToggleFullWidth: () => void
+  groupAvatarMode?: 'icon' | 'initial'
 }) {
   const memberCount = room.memberKeys?.length ?? 0
 
@@ -1114,6 +1142,8 @@ function ConversationHeader({
     <MutedAvatar size={32} />
   ) : room.type === 'dm' && room.person ? (
     <PersonAvatar person={room.person} size={32} />
+  ) : groupAvatarMode === 'initial' ? (
+    <InitialAvatar name={room.title} size={32} />
   ) : (
     <GroupAvatar size={32} />
   )
@@ -1799,6 +1829,7 @@ function Conversation({
   onSend,
   onThreadSend,
   onAction,
+  groupAvatarMode = 'icon',
 }: {
   room: Room
   listOpen: boolean
@@ -1810,6 +1841,7 @@ function Conversation({
   onSend: (text: string) => void
   onThreadSend: (parentId: string, text: string, alsoSend: boolean) => void
   onAction?: (a: ChatAction) => void
+  groupAvatarMode?: 'icon' | 'initial'
 }) {
   // Track the thread root by id (not a snapshot) so the panel re-reads live
   // room state and shows newly sent replies immediately.
@@ -1840,6 +1872,7 @@ function Conversation({
             onToggleMute={onToggleMute}
             isFullWidth={fullWidth}
             onToggleFullWidth={onToggleFullWidth}
+            groupAvatarMode={groupAvatarMode}
           />
           <MessageArea room={room} onOpenThread={openThread} fullWidth={fullWidth} />
           <InputBox key={room.id} fullWidth={fullWidth} onSend={onSend} />
@@ -1873,6 +1906,8 @@ export type ChatVariantConfig = {
   initialFullWidth?: boolean
   /** 聊天列表初始是否展開。預設 true。 */
   initialListOpen?: boolean
+  /** 多人聊天室頭像樣式:'icon'(預設,現狀)/ 'initial'(室名首字母 + 隨機色)。DM 不受影響。 */
+  groupAvatarMode?: 'icon' | 'initial'
 }
 
 // 使用者實際操作事件 — 供 usability test 判定任務是否「真的有做對」。
@@ -1901,6 +1936,7 @@ export default function App({
 
   const current = rooms.find((r) => r.id === activeId) ?? rooms[0]
   const unreadCount = rooms.filter((r) => r.unread && !mutedIds.has(r.id)).length
+  const groupAvatarMode = config?.groupAvatarMode ?? 'icon'
 
   function handleToggleMute(id: string) {
     const willMute = !mutedIds.has(id)
@@ -1973,6 +2009,7 @@ export default function App({
             favOrder={favOrder}
             onToggleMute={handleToggleMute}
             onToggleFavorite={handleToggleFavorite}
+            groupAvatarMode={groupAvatarMode}
           />
         )}
         <Conversation
@@ -1986,6 +2023,7 @@ export default function App({
           onSend={handleSend}
           onThreadSend={handleThreadSend}
           onAction={onAction}
+          groupAvatarMode={groupAvatarMode}
         />
       </div>
       <SettingsModal

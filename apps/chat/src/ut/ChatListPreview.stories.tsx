@@ -61,6 +61,11 @@ const chatListPreviewProject: UTProject = {
   variants: {
     A: { label: '版本 A:列表顯示訊息預覽', config: { initialShowPreview: true } },
     B: { label: '版本 B:精簡列表(不顯示訊息預覽)', config: { initialShowPreview: false } },
+    C: {
+      label: '版本 C:精簡列表 + 多人聊天室字母頭像',
+      // 不顯示訊息預覽;多人(general)聊天室頭像改為室名首字母 + 隨機色;DM 不變。
+      config: { initialShowPreview: false, groupAvatarMode: 'initial' },
+    },
   },
 }
 
@@ -73,10 +78,10 @@ const meta: Meta<typeof UsabilityTest> = {
 export default meta
 type Story = StoryObj<typeof UsabilityTest>
 
-// 綜合測試(推薦):依序跑版本 A → 版本 B,最後給 A/B 比較與綜合結論。
+// 綜合測試(推薦):依序跑版本 A → B → C,最後給三版比較與綜合結論。
 export const CombinedAB: Story = {
-  name: '綜合測試 A→B(含結論)',
-  render: () => <UsabilityTestAB project={chatListPreviewProject} order={['A', 'B']} />,
+  name: '綜合測試 A→B→C(含結論)',
+  render: () => <UsabilityTestAB project={chatListPreviewProject} order={['A', 'B', 'C']} />,
 }
 
 // 單獨跑某一版(需要時用)。
@@ -87,4 +92,8 @@ export const VersionA: Story = {
 export const VersionB: Story = {
   name: '只測版本 B — 精簡列表',
   render: () => <UsabilityTest project={chatListPreviewProject} variant="B" />,
+}
+export const VersionC: Story = {
+  name: '只測版本 C — 精簡列表 + 字母頭像',
+  render: () => <UsabilityTest project={chatListPreviewProject} variant="C" />,
 }
