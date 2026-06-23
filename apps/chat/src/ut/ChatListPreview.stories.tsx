@@ -1,12 +1,14 @@
 import type { Meta, StoryObj } from '@storybook/react'
-import { UsabilityTest, UsabilityTestAB, type UTProject } from './UsabilityTest'
+import { UsabilityTest, UsabilityTestAB, type UTProject } from '@imethan0254/ut-model-a'
+import { chatVariant, type ChatAction } from './chatAdapter'
 
 // ── UT 專案定義:Chat List Preview Message Display Preferences ────────────────
 // 驗證「聊天列表是否顯示訊息預覽」對使用者快速定位對話的影響。
 // A = 顯示預覽(基底預設) / B = 精簡列表(不顯示預覽)。
 //
 // 每個任務的 check() 依「使用者實際操作」判定成功/失敗 —— 光按「完成」不算成功。
-const chatListPreviewProject: UTProject = {
+// 任務後 / 測試後另以「問卷」收主觀感受與開放意見(模型 A 的 survey 層)。
+const chatListPreviewProject: UTProject<ChatAction> = {
   id: 'chat-list-preview',
   title: 'UT – Chat List Preview Message Display Preferences',
   goal: '了解聊天列表「是否顯示最後一則訊息預覽」對使用者快速找到並進入正確對話的影響。',
@@ -14,8 +16,24 @@ const chatListPreviewProject: UTProject = {
     '這是一次易用性測試,我們測的是介面、不是你 — 沒有對錯,依直覺操作即可。',
     '過程中請盡量講出你的想法(放聲思考)。',
     '右下角會出現任務指示;請「實際完成」該操作後再按「完成,下一步」。',
-    '沒有實際完成就按下一步,該任務會被記為「失敗」。',
+    '每個任務做完會跳出一個簡短問卷,最後還有整體問卷。',
     '任務指示框可拖曳移動,避免擋到要操作的地方。',
+  ],
+  // 任務後問卷:套用到所有任務(單一任務可用 task.postTask 覆寫)。
+  postTaskSurvey: [
+    {
+      id: 'seq',
+      questionType: 'singleEase',
+      prompt: '整體而言,這個任務有多容易或多困難?',
+      scalePoints: 7,
+      anchors: { min: '非常困難', max: '非常容易' },
+    },
+  ],
+  // 整場測試結束後問卷:開放題引導受測者表達整體觀點。
+  postTestSurvey: [
+    { id: 'like', questionType: 'writtenResponse', prompt: '這次體驗中你最喜歡的部分是什麼?', minChars: 15 },
+    { id: 'change', questionType: 'writtenResponse', prompt: '如果可以改一件事,你會改什麼?', minChars: 15 },
+    { id: 'unexpected', questionType: 'writtenResponse', prompt: '過程中有沒有遇到任何意外或預期外的狀況?', required: false },
   ],
   tasks: [
     {
@@ -35,6 +53,22 @@ const chatListPreviewProject: UTProject = {
         acts.some((a) => a.type === 'open-room' && a.unread)
           ? { ok: true }
           : { ok: false, reason: '未開啟任何「有未讀訊息」的聊天室' },
+      // 這個任務後多問一題開放題(覆寫 project.postTaskSurvey):SEQ + 開放意見。
+      postTask: [
+        {
+          id: 'seq',
+          questionType: 'singleEase',
+          prompt: '整體而言,這個任務有多容易或多困難?',
+          scalePoints: 7,
+          anchors: { min: '非常困難', max: '非常容易' },
+        },
+        {
+          id: 't2-open',
+          questionType: 'writtenResponse',
+          prompt: '你是怎麼判斷哪些聊天室有未讀訊息的?',
+          required: false,
+        },
+      ],
     },
     {
       id: 't3',
@@ -59,8 +93,8 @@ const chatListPreviewProject: UTProject = {
     },
   ],
   variants: {
-    A: { label: '版本 A:列表顯示訊息預覽', config: { initialShowPreview: true } },
-    B: { label: '版本 B:精簡列表(不顯示訊息預覽)', config: { initialShowPreview: false } },
+    A: chatVariant('版本 A:列表顯示訊息預覽', { initialShowPreview: true }),
+    B: chatVariant('版本 B:精簡列表(不顯示訊息預覽)', { initialShowPreview: false }),
   },
 }
 
