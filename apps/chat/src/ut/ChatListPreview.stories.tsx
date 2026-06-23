@@ -110,9 +110,10 @@ export default meta
 type Story = StoryObj<typeof UsabilityTest>
 
 // 綜合測試(推薦):依序跑版本 A → B → C,最後給三版比較與綜合結論。
+// record:測試開始錄製畫面+講話聲,摘要頁自動下載 webm + Excel。
 export const CombinedAB: Story = {
   name: '綜合測試 A→B→C(含結論)',
-  render: () => <UsabilityTestAB project={chatListPreviewProject} order={['A', 'B', 'C']} />,
+  render: () => <UsabilityTestAB project={chatListPreviewProject} order={['A', 'B', 'C']} record />,
 }
 
 // 單獨跑某一版(需要時用)。
