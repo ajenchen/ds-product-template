@@ -131,7 +131,10 @@ Conversation
 > **Thread 發送 + "replied to a thread" link（2026-06-19 confirmed）**：
 > - State 改造：`Conversation` 用 `threadParentId`（非 message 快照）+ `room.messages.find(id)` 即時查 live 訊息，確保送出後 thread panel 立即顯示新回覆。`onOpenThread` 一律存 `m.id`。
 > - `handleThreadSend(parentId, text, alsoSend)`（App，SSOT of rooms state）：① 一定 append 一則 `threadReply` 到 `parent.threadMessages`（thread panel 內顯示，**普通 bubble、無 link**）。② 若 `alsoSend` 另 append 一則 `mainCopy` 到 `room.messages`（主區顯示），帶 `repliedToThreadParentId: parentId`。
-> - `Message.repliedToThreadParentId?: string`：標記「主區的 thread 回覆副本」。`MessageBubble`（`!isInThread` 時）偵測到 → 渲染 **repliedLink**：`MessagesSquare 16 + "replied to a thread: {母訊息 text}"`（單行 `truncate`），色 `var(--color-primary)`，點擊 `onOpenThread(parent)` 開該 thread。主區同時渲染 `threadLink`(有 threadMessages 時) 與 `repliedLink`(reply 副本時)，兩者互斥。
+> - `Message.repliedToThreadParentId?: string`：標記「主區的 thread 回覆副本」(`isRepliedCopy`)。`MessageBubble` 偵測到 → 渲染 **repliedLink** 並把 bubble + link 包進 `bubbleBlock`（`inline-flex flex-col`，shrink-to-content，align 依 mine）。
+>   - **link 寬度卡在 bubble 寬度內、不超出 bubble 邊緣**：link 外層 `w-0 min-w-full`（對 width 貢獻 0、實際渲染成 bubble 寬度）；內含 L-connector（`border-l border-b rounded-bl-[8px]` 24×12 neutral-4，**shrink-0**，mine/other 皆顯示）+ `MessagesSquare 16`（**shrink-0**，色 `var(--color-primary)` = primary-6）+ 「replied to a thread: {母訊息}」單一 `min-w-0 truncate` span（色 neutral-7）。文字（含 prefix）一起截斷,只保證 L+icon 可見。
+>   - **bubble 太短時加寬**：reply 副本的 bubble 外層加 `minWidth: REPLIED_LINK_MIN_W(120)` → bubble 至少 120px,確保 link 有空間放 L+icon+「…」;bubble 內容比 120 長時正常 hug。
+>   - 點擊 `onOpenThread(parent)` 開該 thread。`bubbleBlock` 在非 reply 副本時 = `{bubble}{threadLink}`（行為不變）;reply 副本時 = bubble + repliedLink。threadLink / repliedLink 互斥。
 
 > **ConversationHeader spec 驗證表（2026-06-09 confirmed）**：avatar 32×32(`size={32}`) · header `py-2`=上下 8px · 標題 `fontSize:16 / fontWeight:500 / lineHeight:'130%'` · icon-only 按鈕全 `size="sm"`=28×28 · 按鈕群 `gap-2`=8px · TeamsCallButton `px-1`=左右 4px + icon `size={18}` · RoomInfoButton `px-1`=4px + icon `size={18}` + badge `h-5`=20px / `pl:4 pr:4 pt:2 pb:2` / `fontSize:12 / lineHeight:'130%'` / `font-medium` · Edit 按鈕 `size="sm"`=28×28。
 
@@ -169,6 +172,8 @@ type Reaction = { emoji; count }
 type Message = { id; author; text; time; status: MsgStatus; reactions[]; replies; threadMessages[]; images?: string[] }
 type Room    = { id; name; type; section: 'favorites' | 'chats'; unread; messages[] }
 ```
+
+Inline image（`message.images`）用 `UNSPLASH(id)` helper 產生 `images.unsplash.com` 直連圖片 URL（允許 hotlink、穩定，用 `?w=480&h=300&fit=crop` 控制尺寸）。之前用 `picsum.photos` 會因 ad-blocker/firewall/403 host_not_allowed 而變破圖。
 
 假資料常數：`PEOPLE`（柯南角色）· `ME` · `INITIAL_ROOMS`（含長訊息 + inline image 範例 + `semi-sales`「IT Sales - Table格式範例」chatroom 的 table 範例：少欄少列 forecast/utilization(hug 範例) + 30 欄 22 列 wafer starts 大表(達 max-h 320px 觸發 hover scrollbar + 水平捲動範例)）· `COMMON_EMOJI`。
 App 以 `useState(INITIAL_ROOMS)` 管理 rooms，`handleSend` 在 active room 尾端 append 新訊息。

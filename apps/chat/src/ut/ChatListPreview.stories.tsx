@@ -4,7 +4,7 @@ import { chatVariant, type ChatAction } from './chatAdapter'
 
 // ── UT 專案定義:Chat List Preview Message Display Preferences ────────────────
 // 驗證「聊天列表是否顯示訊息預覽」對使用者快速定位對話的影響。
-// A = 顯示預覽(基底預設) / B = 精簡列表(不顯示預覽)。
+// A = 顯示預覽(基底預設) / B = 精簡列表(不顯示預覽) / C = 精簡列表 + 多人聊天室字母頭像。
 //
 // 每個任務的 check() 依「使用者實際操作」判定成功/失敗 —— 光按「完成」不算成功。
 // 任務後 / 測試後另以「問卷」收主觀感受與開放意見(模型 A 的 survey 層)。
@@ -95,6 +95,8 @@ const chatListPreviewProject: UTProject<ChatAction> = {
   variants: {
     A: chatVariant('版本 A:列表顯示訊息預覽', { initialShowPreview: true }),
     B: chatVariant('版本 B:精簡列表(不顯示訊息預覽)', { initialShowPreview: false }),
+    // 版本 C:不顯示訊息預覽;多人(general)聊天室頭像改為室名首字母 + 隨機色;DM 不變。
+    C: chatVariant('版本 C:精簡列表 + 多人聊天室字母頭像', { initialShowPreview: false, groupAvatarMode: 'initial' }),
   },
 }
 
@@ -107,10 +109,10 @@ const meta: Meta<typeof UsabilityTest> = {
 export default meta
 type Story = StoryObj<typeof UsabilityTest>
 
-// 綜合測試(推薦):依序跑版本 A → 版本 B,最後給 A/B 比較與綜合結論。
+// 綜合測試(推薦):依序跑版本 A → B → C,最後給三版比較與綜合結論。
 export const CombinedAB: Story = {
-  name: '綜合測試 A→B(含結論)',
-  render: () => <UsabilityTestAB project={chatListPreviewProject} order={['A', 'B']} />,
+  name: '綜合測試 A→B→C(含結論)',
+  render: () => <UsabilityTestAB project={chatListPreviewProject} order={['A', 'B', 'C']} />,
 }
 
 // 單獨跑某一版(需要時用)。
@@ -121,4 +123,8 @@ export const VersionA: Story = {
 export const VersionB: Story = {
   name: '只測版本 B — 精簡列表',
   render: () => <UsabilityTest project={chatListPreviewProject} variant="B" />,
+}
+export const VersionC: Story = {
+  name: '只測版本 C — 精簡列表 + 字母頭像',
+  render: () => <UsabilityTest project={chatListPreviewProject} variant="C" />,
 }
