@@ -102,6 +102,25 @@ export const VersionB: Story = { name: '只測版本 B', render: () => <Usabilit
 
 > 三版以上:`order` 目前是兩版綜合流程;要 A→B→C 可分別跑單版 story,或回報需求由模型 A 加多版流程(改的是引擎、發新版,不在消費端硬改)。
 
+## 4b. (選用)在任務中安插問卷 / 開放性問題
+
+模型 A 支援任務後(post-task)與測試後(post-test)問卷,用來收主觀感受與開放意見。v1 題型:
+`singleEase`(SEQ,預設 7 點)、`writtenResponse`(開放題,可設 `minChars`)。在 config 加:
+
+```ts
+postTaskSurvey: [
+  { id: 'seq', questionType: 'singleEase', prompt: '這個任務有多容易或多困難?', scalePoints: 7,
+    anchors: { min: '非常困難', max: '非常容易' } },
+],
+postTestSurvey: [
+  { id: 'like', questionType: 'writtenResponse', prompt: '最喜歡的部分是什麼?', minChars: 25 },
+  { id: 'change', questionType: 'writtenResponse', prompt: '如果可以改一件事,你會改什麼?', minChars: 25 },
+],
+```
+單一任務想問不同題 → 在該 `task.postTask` 放題目(覆寫 project 預設)。
+
+指引:文案中性非引導;量表預設 7 點;開放題單場建議 ≤ 1–2 題避免疲勞;`post-task` 題綁該任務、`post-test` 收整體。問卷回應會進結果頁 + Excel/文字匯出。
+
 ## 5. 驗證
 
 - `npm run typecheck` 綠

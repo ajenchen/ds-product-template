@@ -71,6 +71,36 @@ import { UsabilityTest, UsabilityTestAB } from '@imethan0254/ut-model-a'
 
 `password` 是測試頁自己的密碼閘門(預設 `0000`),與 Netlify Basic Password 無關。
 
+## 問卷(survey)— 任務後 / 測試後安插主觀回饋
+
+在任務的「實際操作判定」之外,可在 config 加問卷,捕捉主觀感受與開放性意見。v1 題型:
+`singleEase`(SEQ 單題難易度量表,預設 7 點)、`writtenResponse`(開放式文字,可設最低字數)。
+
+```ts
+const project: UTProject<MyAction> = {
+  ...
+  // 每個任務完成後彈出(overlay);單一 task 可用 task.postTask 覆寫
+  postTaskSurvey: [
+    { id: 'seq', questionType: 'singleEase',
+      prompt: '整體而言,這個任務有多容易或多困難?',
+      scalePoints: 7, anchors: { min: '非常困難', max: '非常容易' } },
+  ],
+  // 整場測試結束、結果頁前彈出一次
+  postTestSurvey: [
+    { id: 'like', questionType: 'writtenResponse', prompt: '這次體驗中你最喜歡的部分是什麼?', minChars: 25 },
+    { id: 'change', questionType: 'writtenResponse', prompt: '如果可以改一件事,你會改什麼?', minChars: 25 },
+  ],
+  tasks: [
+    { id: 't1', title: '…', check: (a) => …,
+      // 只在這個任務後問一題開放題(覆寫 project.postTaskSurvey)
+      postTask: [{ id: 't1-open', questionType: 'writtenResponse', prompt: '剛剛操作時你在想什麼?', required: false }] },
+  ],
+}
+```
+
+問卷回應會進結果頁,並一併匯出 Excel / 文字。文案請維持中性、非引導(要「你的第一印象是什麼?」不要「你喜歡嗎?」),開放題建議單場 ≤ 1–2 題避免疲勞。
+> roadmap(尚未做):ratingScale / likert / nps(含計分) / multipleChoice / matrix / SUS 題組 / 跳題邏輯 / 期望vs體驗散佈圖。
+
 ## 設計原則
 
 引擎對「被測 prototype」完全不可知 —— 它只認識 `render()` 與 `onAction`。

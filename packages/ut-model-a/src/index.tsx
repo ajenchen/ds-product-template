@@ -14,7 +14,7 @@
 // tasks[].check(actions) 依消費端自訂的 Action 型別判定。引擎對 Action 泛型,完全不認識 chat。
 // ════════════════════════════════════════════════════════════════════════════
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Button, Input, ProgressBar, Notice } from '@qijenchen/design-system'
+import { Button, Input, Textarea, ProgressBar, Notice } from '@qijenchen/design-system'
 import {
   ClipboardList, Target, Info, FileSpreadsheet, ClipboardCopy, RotateCcw, Check, ArrowRight,
   GripVertical, ChevronDown, ChevronUp, CheckCircle2, XCircle, Mic, MicOff, Lock,
@@ -23,12 +23,49 @@ import {
 // ── 型別(對外契約)─────────────────────────────────────────────────────────
 export type UTaskResult = 'success' | 'fail'
 
+// ── 問卷(survey)— 任務後 / 測試後安插主觀回饋與開放性問題 ────────────────────
+// v1 題型:singleEase(SEQ 單題難易度量表,預設 7 點)+ writtenResponse(開放式文字)。
+// 設計原則:中性非引導文案、量表預設 7 點可覆寫、開放題可設最低字數。新增題型 =
+// 在 QuestionRenderer 加一個 case + union 加一支,不動流程。
+export type SurveyQuestion =
+  | {
+      id: string
+      questionType: 'singleEase'
+      prompt: string
+      /** 量表點數,預設 7(信度較 5 點高)。可覆寫為 5。 */
+      scalePoints?: number
+      /** 兩端錨點文案,預設 非常困難 / 非常容易。 */
+      anchors?: { min: string; max: string }
+      /** 預設 true。 */
+      required?: boolean
+    }
+  | {
+      id: string
+      questionType: 'writtenResponse'
+      prompt: string
+      /** 最低字數,未達不可送出(僅 required 題強制)。 */
+      minChars?: number
+      placeholder?: string
+      /** 預設 true。 */
+      required?: boolean
+    }
+
+/** 受測者對單一題目的作答。scale 類 value 為 number;開放題為 string。 */
+export type SurveyAnswer = {
+  questionId: string
+  questionType: SurveyQuestion['questionType']
+  prompt: string
+  value: number | string
+}
+
 /** 單一任務。check 依「任務進行期間累積的操作(你的 prototype 吐出的 Action)」判定成功與否。 */
 export type UTask<A = unknown> = {
   id: string
   title: string
   hint?: string
   check: (actions: A[]) => { ok: boolean; reason?: string }
+  /** 此任務完成後彈出的問卷;未設則沿用 project.postTaskSurvey。 */
+  postTask?: SurveyQuestion[]
 }
 
 /**
@@ -48,6 +85,15 @@ export type UTProject<A = unknown> = {
   instructions: string[]
   tasks: UTask<A>[]
   variants: Record<string, UTVariant<A>>
+  /** 任務後問卷(套用到所有任務;單一任務可用 task.postTask 覆寫)。 */
+  postTaskSurvey?: SurveyQuestion[]
+  /** 整場測試結束後問卷(開放題 + 整體滿意度等)。 */
+  postTestSurvey?: SurveyQuestion[]
+}
+
+/** 取某任務的任務後問卷:task 層覆寫優先,否則用 project 預設。 */
+function postTaskQuestionsFor<A>(project: UTProject<A>, task: UTask<A>): SurveyQuestion[] {
+  return task.postTask ?? project.postTaskSurvey ?? []
 }
 
 type TaskOutcome = { id: string; title: string; result: UTaskResult; reason?: string }
@@ -62,6 +108,8 @@ type VariantRun = {
   finishedAt: Date
   /** 放聲思考逐字稿(可能為空:不支援或未授權麥克風)。 */
   transcript: string
+  /** 每個任務後問卷的作答(無問卷的任務不會出現)。 */
+  taskSurveys: { taskId: string; taskTitle: string; answers: SurveyAnswer[] }[]
 }
 
 // ── 小色票 chip ────────────────────────────────────────────────────────────
@@ -288,18 +336,180 @@ function TaskPanel({
   )
 }
 
+// ── 問卷:單題渲染器(題型驅動;新增題型 = 加一個 case)──────────────────────
+function QuestionRenderer({
+  q, value, onChange,
+}: {
+  q: SurveyQuestion
+  value: number | string | undefined
+  onChange: (v: number | string) => void
+}) {
+  if (q.questionType === 'singleEase') {
+    const pts = q.scalePoints ?? 7
+    const anchors = q.anchors ?? { min: '非常困難', max: '非常容易' }
+    return (
+      <div>
+        <p className="text-neutral-9" style={{ fontSize: 14, fontWeight: 500, lineHeight: '150%' }}>{q.prompt}</p>
+        <div className="mt-3 flex gap-1.5">
+          {Array.from({ length: pts }, (_, i) => i + 1).map((n) => {
+            const selected = value === n
+            return (
+              <button
+                key={n}
+                type="button"
+                onClick={() => onChange(n)}
+                className="flex h-9 flex-1 items-center justify-center rounded-lg border"
+                style={{
+                  borderColor: selected ? 'var(--color-primary)' : 'var(--color-neutral-5)',
+                  backgroundColor: selected ? 'var(--color-primary)' : 'var(--color-surface)',
+                  color: selected ? 'var(--color-on-emphasis, #fff)' : 'var(--color-neutral-8)',
+                  fontSize: 13, fontWeight: 600,
+                }}
+              >
+                {n}
+              </button>
+            )
+          })}
+        </div>
+        <div className="mt-1 flex justify-between text-neutral-6" style={{ fontSize: 11 }}>
+          <span>{anchors.min}</span>
+          <span>{anchors.max}</span>
+        </div>
+      </div>
+    )
+  }
+  // writtenResponse
+  const text = typeof value === 'string' ? value : ''
+  const min = q.minChars ?? 0
+  const len = text.trim().length
+  return (
+    <div>
+      <p className="text-neutral-9" style={{ fontSize: 14, fontWeight: 500, lineHeight: '150%' }}>{q.prompt}</p>
+      <Textarea
+        className="mt-2"
+        rows={3}
+        placeholder={q.placeholder ?? '請輸入你的想法…'}
+        value={text}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      {min > 0 && (
+        <p className="mt-1 text-neutral-6" style={{ fontSize: 11 }}>
+          {len >= min ? `已達最低字數(${len} 字)` : `至少 ${min} 字,還差 ${min - len} 字`}
+        </p>
+      )}
+    </div>
+  )
+}
+
+// ── 問卷:一個作答步驟(post-task 用 overlay,post-test 用整頁)──────────────
+function isAnswerValid(q: SurveyQuestion, value: number | string | undefined): boolean {
+  const required = q.required ?? true
+  if (q.questionType === 'singleEase') return !required || typeof value === 'number'
+  const text = (typeof value === 'string' ? value : '').trim()
+  if (!required && text.length === 0) return true
+  if (text.length === 0) return false
+  return text.length >= (q.minChars ?? 0)
+}
+
+function SurveyStep({
+  badge, title, questions, submitLabel = '送出', presentation = 'screen', onSubmit,
+}: {
+  badge: string
+  title: string
+  questions: SurveyQuestion[]
+  submitLabel?: string
+  presentation?: 'screen' | 'overlay'
+  onSubmit: (answers: SurveyAnswer[]) => void
+}) {
+  const [values, setValues] = useState<Record<string, number | string>>({})
+  const valid = questions.every((q) => isAnswerValid(q, values[q.id]))
+
+  function submit() {
+    const answers: SurveyAnswer[] = questions.map((q) => ({
+      questionId: q.id,
+      questionType: q.questionType,
+      prompt: q.prompt,
+      value: values[q.id] ?? (q.questionType === 'singleEase' ? 0 : ''),
+    }))
+    onSubmit(answers)
+  }
+
+  const card = (
+    <div className="max-h-full w-full max-w-[560px] overflow-auto rounded-xl border border-neutral-5 bg-surface p-8 shadow-lg">
+      <Chip tone="info" className="mb-3">{badge}</Chip>
+      <h2 className="text-neutral-9" style={{ fontSize: 18, fontWeight: 600, lineHeight: '130%' }}>{title}</h2>
+      <div className="mt-5 space-y-6">
+        {questions.map((q) => (
+          <QuestionRenderer key={q.id} q={q} value={values[q.id]} onChange={(v) => setValues((prev) => ({ ...prev, [q.id]: v }))} />
+        ))}
+      </div>
+      <Button variant="primary" className="mt-6 w-full" disabled={!valid} onClick={submit}>{submitLabel}</Button>
+    </div>
+  )
+
+  if (presentation === 'overlay') {
+    return <div className="fixed inset-0 z-[1100] flex items-center justify-center p-6" style={{ backgroundColor: 'rgba(0,0,0,0.32)' }}>{card}</div>
+  }
+  return <div className="flex h-screen w-full items-center justify-center bg-canvas p-6">{card}</div>
+}
+
+// ── 問卷:結果頁的作答清單 ───────────────────────────────────────────────────
+function SurveyAnswerList({ answers }: { answers: SurveyAnswer[] }) {
+  return (
+    <ul className="mt-2 space-y-2">
+      {answers.map((a) => (
+        <li key={a.questionId}>
+          <p className="text-neutral-6" style={{ fontSize: 12 }}>{a.prompt}</p>
+          <p className="text-neutral-9" style={{ fontSize: 13, fontWeight: 500, lineHeight: '150%' }}>
+            {a.questionType === 'singleEase'
+              ? `${a.value} 分`
+              : (String(a.value).trim() || '(未填)')}
+          </p>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 // ── 單一版本的任務執行階段 ───────────────────────────────────────────────────
 function RunPhase<A>({ project, variant, onDone }: { project: UTProject<A>; variant: string; onDone: (run: VariantRun) => void }) {
   const v = project.variants[variant]
   const actionsRef = useRef<A[]>([])
   const taskStartRef = useRef(0)
   const outcomesRef = useRef<TaskOutcome[]>([])
+  const surveysRef = useRef<{ taskId: string; taskTitle: string; answers: SurveyAnswer[] }[]>([])
   const startedRef = useRef<Date>(new Date())
   const [index, setIndex] = useState(0)
+  // 不為 null 時表示正在作答 tasks[surveyIdx] 的任務後問卷(以 overlay 蓋在 prototype 上)。
+  const [surveyIdx, setSurveyIdx] = useState<number | null>(null)
   const rec = useThinkAloud()
 
   // 進入測試即自動開始錄音(intro 的按鈕點擊提供了 user gesture)。
   useEffect(() => { rec.start() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function finishVariant() {
+    const outcomes = outcomesRef.current
+    const successCount = outcomes.filter((o) => o.result === 'success').length
+    const total = outcomes.length
+    const transcript = rec.stop()
+    onDone({
+      variant,
+      variantLabel: v.label,
+      outcomes,
+      successCount,
+      total,
+      rate: total ? Math.round((successCount / total) * 100) : 0,
+      startedAt: startedRef.current,
+      finishedAt: new Date(),
+      transcript,
+      taskSurveys: surveysRef.current,
+    })
+  }
+
+  function advanceOrFinish() {
+    if (index >= project.tasks.length - 1) finishVariant()
+    else setIndex(index + 1)
+  }
 
   function complete() {
     const task = project.tasks[index]
@@ -313,32 +523,39 @@ function RunPhase<A>({ project, variant, onDone }: { project: UTProject<A>; vari
     })
     taskStartRef.current = actionsRef.current.length
 
-    if (index >= project.tasks.length - 1) {
-      const outcomes = outcomesRef.current
-      const successCount = outcomes.filter((o) => o.result === 'success').length
-      const total = outcomes.length
-      const transcript = rec.stop()
-      onDone({
-        variant,
-        variantLabel: v.label,
-        outcomes,
-        successCount,
-        total,
-        rate: total ? Math.round((successCount / total) * 100) : 0,
-        startedAt: startedRef.current,
-        finishedAt: new Date(),
-        transcript,
-      })
-    } else {
-      setIndex(index + 1)
+    // 有任務後問卷 → 先彈問卷,作答後才前進。
+    if (postTaskQuestionsFor(project, task).length > 0) {
+      setSurveyIdx(index)
+      return
     }
+    advanceOrFinish()
   }
+
+  function onSurveySubmit(answers: SurveyAnswer[]) {
+    const task = project.tasks[index]
+    surveysRef.current.push({ taskId: task.id, taskTitle: task.title, answers })
+    setSurveyIdx(null)
+    advanceOrFinish()
+  }
+
+  const surveyTask = surveyIdx !== null ? project.tasks[surveyIdx] : null
 
   return (
     <div className="relative h-screen w-full">
       {v.render({ onAction: (a) => { actionsRef.current.push(a) } })}
       <FloatingStatus variant={variant} rec={rec} />
       <TaskPanel tasks={project.tasks} index={index} onComplete={complete} />
+      {surveyTask && (
+        <SurveyStep
+          key={surveyTask.id}
+          badge={`任務 ${surveyIdx! + 1} 後問卷`}
+          title="完成了!請回答幾個問題"
+          questions={postTaskQuestionsFor(project, surveyTask)}
+          submitLabel="送出,繼續"
+          presentation="overlay"
+          onSubmit={onSurveySubmit}
+        />
+      )}
     </div>
   )
 }
@@ -525,8 +742,57 @@ function ResultShell({ badge, children }: { badge: string; children: ReactNode }
   )
 }
 
+// ── 問卷:匯出文字列 + 結果頁區塊 ─────────────────────────────────────────────
+function fmtAnswer(a: SurveyAnswer): string {
+  return a.questionType === 'singleEase' ? `${a.value} 分` : (String(a.value).trim() || '(未填)')
+}
+function surveyTextLines(label: string, taskSurveys: VariantRun['taskSurveys'], postTestAnswers: SurveyAnswer[]): string[] {
+  const out: string[] = []
+  if (taskSurveys.length) {
+    out.push(`${label}任務後問卷:`)
+    for (const ts of taskSurveys) {
+      out.push(`  任務:${ts.taskTitle}`)
+      for (const a of ts.answers) out.push(`    - ${a.prompt} → ${fmtAnswer(a)}`)
+    }
+  }
+  if (postTestAnswers.length) {
+    out.push('整場結束問卷:')
+    for (const a of postTestAnswers) out.push(`  - ${a.prompt} → ${fmtAnswer(a)}`)
+  }
+  return out
+}
+function surveyExcelRows(taskSurveys: VariantRun['taskSurveys'], postTestAnswers: SurveyAnswer[]): (string | number)[][] {
+  const rows: (string | number)[][] = []
+  for (const ts of taskSurveys) {
+    for (const a of ts.answers) rows.push([`問卷 · ${ts.taskTitle}`, a.prompt, fmtAnswer(a)])
+  }
+  for (const a of postTestAnswers) rows.push(['問卷 · 整場結束', a.prompt, fmtAnswer(a)])
+  return rows
+}
+function SurveySection({ heading, taskSurveys, postTestAnswers }: { heading: string; taskSurveys: VariantRun['taskSurveys']; postTestAnswers?: SurveyAnswer[] }) {
+  const post = postTestAnswers ?? []
+  if (!taskSurveys.length && !post.length) return null
+  return (
+    <div className="mt-5">
+      <p className="text-neutral-9" style={{ fontSize: 13, fontWeight: 600 }}>{heading}</p>
+      {taskSurveys.map((ts) => (
+        <div key={ts.taskId} className="mt-3">
+          <p className="text-neutral-7" style={{ fontSize: 12, fontWeight: 600 }}>任務:{ts.taskTitle}</p>
+          <SurveyAnswerList answers={ts.answers} />
+        </div>
+      ))}
+      {post.length > 0 && (
+        <div className="mt-3">
+          <p className="text-neutral-7" style={{ fontSize: 12, fontWeight: 600 }}>整場結束問卷</p>
+          <SurveyAnswerList answers={post} />
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── 單版本結果頁 ─────────────────────────────────────────────────────────────
-function SingleResultScreen({ project, run, tester, onReset }: { project: UTProject<any>; run: VariantRun; tester: string; onReset: () => void }) {
+function SingleResultScreen({ project, run, tester, postTestAnswers, onReset }: { project: UTProject<any>; run: VariantRun; tester: string; postTestAnswers: SurveyAnswer[]; onReset: () => void }) {
   function excel() {
     const rows: (string | number)[][] = [
       ['測試名稱', project.title],
@@ -541,6 +807,7 @@ function SingleResultScreen({ project, run, tester, onReset }: { project: UTProj
       [],
       ['放聲思考重點', digestTranscript(run.transcript).join(' / ') || '(無)'],
       ['放聲思考逐字稿', run.transcript || '(無)'],
+      ...(run.taskSurveys.length || postTestAnswers.length ? [[], ['類別', '題目', '作答'], ...surveyExcelRows(run.taskSurveys, postTestAnswers)] : []),
     ]
     downloadExcel(`UT-${project.id}-${run.variant}-${tester || 'anon'}.xls`, rows)
   }
@@ -558,6 +825,7 @@ function SingleResultScreen({ project, run, tester, onReset }: { project: UTProj
       '',
       `放聲思考重點:${digestTranscript(run.transcript).join(' / ') || '(無)'}`,
       `放聲思考逐字稿:${run.transcript || '(無)'}`,
+      ...(run.taskSurveys.length || postTestAnswers.length ? ['', ...surveyTextLines('', run.taskSurveys, postTestAnswers)] : []),
     ]
     copyToClipboard(lines.join('\n'))
   }
@@ -586,6 +854,8 @@ function SingleResultScreen({ project, run, tester, onReset }: { project: UTProj
 
       <TranscriptBlock title="放聲思考逐字稿" transcript={run.transcript} />
 
+      <SurveySection heading="問卷回饋" taskSurveys={run.taskSurveys} postTestAnswers={postTestAnswers} />
+
       <Notice className="mt-5" variant="info" title="把結果交回給研究人員" description="可匯出 Excel 或複製純文字,貼到你們彙整結果的試算表 / 文件。" />
       <ExportBar onExcel={excel} onCopyText={text} onReset={onReset} />
     </ResultShell>
@@ -609,7 +879,7 @@ function thinkAloudNote(a: VariantRun, b: VariantRun) {
   return `放聲思考重點 — 版本 A:${da.length ? da.join(';') : '(無明顯關鍵反饋)'};版本 B:${db.length ? db.join(';') : '(無明顯關鍵反饋)'}。`
 }
 
-function CombinedResultScreen({ project, runA, runB, tester, onReset }: { project: UTProject<any>; runA: VariantRun; runB: VariantRun; tester: string; onReset: () => void }) {
+function CombinedResultScreen({ project, runA, runB, tester, postTestAnswers, onReset }: { project: UTProject<any>; runA: VariantRun; runB: VariantRun; tester: string; postTestAnswers: SurveyAnswer[]; onReset: () => void }) {
   const conclusion = concludeText(runA, runB)
   const taNote = thinkAloudNote(runA, runB)
 
@@ -638,6 +908,12 @@ function CombinedResultScreen({ project, runA, runB, tester, onReset }: { projec
       [],
       ['版本 A 逐字稿', runA.transcript || '(無)'],
       ['版本 B 逐字稿', runB.transcript || '(無)'],
+      ...(runA.taskSurveys.length || runB.taskSurveys.length || postTestAnswers.length
+        ? [[], ['類別', '題目', '作答'],
+            ...surveyExcelRows(runA.taskSurveys, []).map((r) => [`A · ${r[0]}`, r[1], r[2]]),
+            ...surveyExcelRows(runB.taskSurveys, []).map((r) => [`B · ${r[0]}`, r[1], r[2]]),
+            ...surveyExcelRows([], postTestAnswers)]
+        : []),
     ]
     downloadExcel(`UT-${project.id}-AB-${tester || 'anon'}.xls`, rows)
   }
@@ -662,6 +938,12 @@ function CombinedResultScreen({ project, runA, runB, tester, onReset }: { projec
       '',
       `版本 A 逐字稿:${runA.transcript || '(無)'}`,
       `版本 B 逐字稿:${runB.transcript || '(無)'}`,
+      ...(runA.taskSurveys.length || runB.taskSurveys.length || postTestAnswers.length
+        ? ['',
+            ...surveyTextLines('版本 A ', runA.taskSurveys, []),
+            ...surveyTextLines('版本 B ', runB.taskSurveys, []),
+            ...surveyTextLines('', [], postTestAnswers)]
+        : []),
     ]
     copyToClipboard(lines.join('\n'))
   }
@@ -704,7 +986,11 @@ function CombinedResultScreen({ project, runA, runB, tester, onReset }: { projec
       <OutcomeList outcomes={runB.outcomes} />
       <TranscriptBlock title="版本 B 放聲思考逐字稿" transcript={runB.transcript} />
 
-      <Notice className="mt-5" variant="info" title="把綜合結果交回給研究人員" description="可匯出 Excel(含 A/B 逐項比較、結論、逐字稿)或複製純文字。" />
+      <SurveySection heading="版本 A 問卷回饋" taskSurveys={runA.taskSurveys} />
+      <SurveySection heading="版本 B 問卷回饋" taskSurveys={runB.taskSurveys} />
+      <SurveySection heading="整場結束問卷" taskSurveys={[]} postTestAnswers={postTestAnswers} />
+
+      <Notice className="mt-5" variant="info" title="把綜合結果交回給研究人員" description="可匯出 Excel(含 A/B 逐項比較、結論、逐字稿、問卷)或複製純文字。" />
       <ExportBar onExcel={excel} onCopyText={text} onReset={onReset} />
     </ResultShell>
   )
@@ -713,9 +999,11 @@ function CombinedResultScreen({ project, runA, runB, tester, onReset }: { projec
 // ── 對外:單版本流程(VersionA / VersionB 用)────────────────────────────────
 export function UsabilityTest<A>({ project, variant, password = '0000' }: { project: UTProject<A>; variant: string; password?: string }) {
   const [unlocked, setUnlocked] = useState(false)
-  const [phase, setPhase] = useState<'intro' | 'running' | 'done'>('intro')
+  const [phase, setPhase] = useState<'intro' | 'running' | 'posttest' | 'done'>('intro')
   const [tester, setTester] = useState('')
   const [run, setRun] = useState<VariantRun | null>(null)
+  const [postTest, setPostTest] = useState<SurveyAnswer[]>([])
+  const postTestQs = project.postTestSurvey ?? []
 
   if (!unlocked) return <PasswordGate password={password} onUnlock={() => setUnlocked(true)} />
 
@@ -732,21 +1020,34 @@ export function UsabilityTest<A>({ project, variant, password = '0000' }: { proj
     )
   }
   if (phase === 'running') {
-    return <RunPhase project={project} variant={variant} onDone={(r) => { setRun(r); setPhase('done') }} />
+    return <RunPhase project={project} variant={variant} onDone={(r) => { setRun(r); setPhase(postTestQs.length ? 'posttest' : 'done') }} />
   }
-  return <SingleResultScreen project={project} run={run!} tester={tester} onReset={() => { setPhase('intro'); setTester(''); setRun(null) }} />
+  if (phase === 'posttest') {
+    return (
+      <SurveyStep
+        badge="測試結束問卷"
+        title="最後幾個整體問題"
+        questions={postTestQs}
+        submitLabel="送出並查看結果"
+        onSubmit={(a) => { setPostTest(a); setPhase('done') }}
+      />
+    )
+  }
+  return <SingleResultScreen project={project} run={run!} tester={tester} postTestAnswers={postTest} onReset={() => { setPhase('intro'); setTester(''); setRun(null); setPostTest([]) }} />
 }
 
 // ── 對外:A→B 雙版本綜合流程 ────────────────────────────────────────────────
 export function UsabilityTestAB<A>({ project, order = ['A', 'B'], password = '0000' }: { project: UTProject<A>; order?: [string, string]; password?: string }) {
   const [vA, vB] = order
   const [unlocked, setUnlocked] = useState(false)
-  const [phase, setPhase] = useState<'intro' | 'runA' | 'interstitial' | 'runB' | 'done'>('intro')
+  const [phase, setPhase] = useState<'intro' | 'runA' | 'interstitial' | 'runB' | 'posttest' | 'done'>('intro')
   const [tester, setTester] = useState('')
   const [runA, setRunA] = useState<VariantRun | null>(null)
   const [runB, setRunB] = useState<VariantRun | null>(null)
+  const [postTest, setPostTest] = useState<SurveyAnswer[]>([])
+  const postTestQs = project.postTestSurvey ?? []
 
-  function reset() { setPhase('intro'); setTester(''); setRunA(null); setRunB(null) }
+  function reset() { setPhase('intro'); setTester(''); setRunA(null); setRunB(null); setPostTest([]) }
 
   if (!unlocked) return <PasswordGate password={password} onUnlock={() => setUnlocked(true)} />
 
@@ -782,7 +1083,18 @@ export function UsabilityTestAB<A>({ project, order = ['A', 'B'], password = '00
     )
   }
   if (phase === 'runB') {
-    return <RunPhase project={project} variant={vB} onDone={(r) => { setRunB(r); setPhase('done') }} />
+    return <RunPhase project={project} variant={vB} onDone={(r) => { setRunB(r); setPhase(postTestQs.length ? 'posttest' : 'done') }} />
   }
-  return <CombinedResultScreen project={project} runA={runA!} runB={runB!} tester={tester} onReset={reset} />
+  if (phase === 'posttest') {
+    return (
+      <SurveyStep
+        badge="測試結束問卷"
+        title="最後幾個整體問題"
+        questions={postTestQs}
+        submitLabel="送出並查看結果"
+        onSubmit={(a) => { setPostTest(a); setPhase('done') }}
+      />
+    )
+  }
+  return <CombinedResultScreen project={project} runA={runA!} runB={runB!} tester={tester} postTestAnswers={postTest} onReset={reset} />
 }
