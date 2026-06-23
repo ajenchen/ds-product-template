@@ -71,6 +71,22 @@ import { UsabilityTest, UsabilityTestAB } from '@imethan0254/ut-model-a'
 
 `password` 是測試頁自己的密碼閘門(預設 `0000`),與 Netlify Basic Password 無關。
 
+## 摘要頁自動交付(Excel + 螢幕錄製)
+
+到結果頁時引擎會**自動把測試結果 Excel 下載**到使用者的下載資料夾,並跳一個 toast 告知。
+
+加 `record` prop 可額外**錄製整個測試過程(畫面 + 麥克風講話聲)**,結束自動下載 `.webm`:
+
+```tsx
+<UsabilityTestAB project={project} order={['A', 'B', 'C']} record />
+<UsabilityTest project={project} variant="A" record />
+```
+
+限制(瀏覽器層面,務必知道):
+- `record` 啟用時,測試**開始**會跳「分享畫面」授權框,使用者須自行選擇分享範圍(瀏覽器強制,不能自動)。建議 **Chrome / Edge**(Safari 對螢幕錄製支援有限)。
+- toast **只通知、不附按鈕**:網頁無法打開作業系統的「下載」資料夾(沒有這種 API)。檔案就在使用者的預設下載資料夾。
+- 自動下載依賴「結束前剛點過按鈕」的近期互動;首次多檔下載 Chrome 可能問一次「允許多個下載」。
+
 ## 問卷(survey)— 任務後 / 測試後安插主觀回饋
 
 在任務的「實際操作判定」之外,可在 config 加問卷,捕捉主觀感受與開放性意見。v1 題型:

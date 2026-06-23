@@ -157,6 +157,143 @@ async function copyToClipboard(text: string): Promise<boolean> {
   try { await navigator.clipboard.writeText(text); return true } catch { return false }
 }
 
+// 觸發一個 Blob 的瀏覽器下載(存到使用者的「下載」資料夾)。
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  setTimeout(() => URL.revokeObjectURL(url), 10000)
+}
+
+// ── 螢幕錄製:畫面(getDisplayMedia)+ 麥克風講話聲(getUserMedia)混音 → webm ──
+// 必須由 user gesture 觸發(intro 的「開始測試」按鈕)。使用者會看到瀏覽器的「分享畫面」
+// 授權框並自行選擇分享範圍;取消或不支援時 graceful 不錄(測試照常進行)。建議 Chrome / Edge。
+function pickRecorderMime(): { mimeType: string } | undefined {
+  if (typeof MediaRecorder === 'undefined') return undefined
+  for (const t of ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm']) {
+    if (MediaRecorder.isTypeSupported(t)) return { mimeType: t }
+  }
+  return undefined
+}
+type ScreenRecorder = { started: boolean; start: () => Promise<void>; stop: () => Promise<Blob | null> }
+function useScreenRecorder(): ScreenRecorder {
+  const startedRef = useRef(false)
+  const recorderRef = useRef<MediaRecorder | null>(null)
+  const chunksRef = useRef<Blob[]>([])
+  const streamsRef = useRef<MediaStream[]>([])
+  const audioCtxRef = useRef<AudioContext | null>(null)
+  const [started, setStarted] = useState(false)
+
+  function cleanup() {
+    streamsRef.current.forEach((s) => s.getTracks().forEach((t) => t.stop()))
+    streamsRef.current = []
+    try { audioCtxRef.current?.close() } catch { /* ignore */ }
+    audioCtxRef.current = null
+    recorderRef.current = null
+  }
+
+  async function start() {
+    if (startedRef.current) return
+    const md = typeof navigator !== 'undefined' ? navigator.mediaDevices : undefined
+    if (!md?.getDisplayMedia) return
+    try {
+      const display = await md.getDisplayMedia({ video: true, audio: true })
+      streamsRef.current.push(display)
+      let mic: MediaStream | null = null
+      try { mic = await md.getUserMedia({ audio: true }); streamsRef.current.push(mic) } catch { /* mic 可選 */ }
+
+      const videoTrack = display.getVideoTracks()[0]
+      const audioInputs = [...display.getAudioTracks(), ...(mic ? mic.getAudioTracks() : [])]
+      const tracks: MediaStreamTrack[] = [videoTrack]
+      if (audioInputs.length === 1) {
+        tracks.push(audioInputs[0])
+      } else if (audioInputs.length > 1) {
+        // 多個音源(系統音 + 麥克風)→ 用 Web Audio 混成單一 track。
+        const Ctx: typeof AudioContext = (window as any).AudioContext || (window as any).webkitAudioContext
+        const ctx = new Ctx()
+        audioCtxRef.current = ctx
+        const dest = ctx.createMediaStreamDestination()
+        audioInputs.forEach((t) => ctx.createMediaStreamSource(new MediaStream([t])).connect(dest))
+        tracks.push(dest.stream.getAudioTracks()[0])
+      }
+
+      const rec = new MediaRecorder(new MediaStream(tracks), pickRecorderMime())
+      chunksRef.current = []
+      rec.ondataavailable = (e) => { if (e.data && e.data.size) chunksRef.current.push(e.data) }
+      rec.start()
+      recorderRef.current = rec
+      startedRef.current = true
+      setStarted(true)
+    } catch {
+      // 使用者取消分享 / 不允許 → 不錄製
+      cleanup()
+    }
+  }
+
+  function stop(): Promise<Blob | null> {
+    return new Promise((resolve) => {
+      const rec = recorderRef.current
+      if (!rec || rec.state === 'inactive') { cleanup(); resolve(null); return }
+      rec.onstop = () => {
+        const blob = chunksRef.current.length
+          ? new Blob(chunksRef.current, { type: chunksRef.current[0].type || 'video/webm' })
+          : null
+        cleanup()
+        resolve(blob)
+      }
+      try { rec.stop() } catch { cleanup(); resolve(null) }
+    })
+  }
+
+  useEffect(() => () => cleanup(), [])
+  return { started, start, stop }
+}
+
+// ── 輕量 toast(右下方堆疊,自動消失;依需求不放按鈕)────────────────────────
+type ToastMsg = { id: number; text: string }
+function ToastHost({ toasts }: { toasts: ToastMsg[] }) {
+  if (!toasts.length) return null
+  return (
+    <div className="fixed bottom-6 left-1/2 z-[1300] flex w-[min(92vw,420px)] -translate-x-1/2 flex-col items-stretch gap-2">
+      {toasts.map((t) => (
+        <div key={t.id} className="flex items-center gap-2 rounded-lg border border-neutral-5 bg-surface px-4 py-2.5 shadow-lg" style={{ fontSize: 13 }}>
+          <Check size={16} className="shrink-0" style={{ color: 'var(--color-success-text)' }} />
+          <span className="text-neutral-9">{t.text}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// 到摘要頁時自動交付:① 立即匯出 Excel ② 螢幕錄影 blob 就緒後下載 ③ 各自跳 toast。
+function useAutoDeliver(opts: { excel: () => void; recordingBase: string; recording: boolean; recordingBlob: Blob | null }): ToastMsg[] {
+  const [toasts, setToasts] = useState<ToastMsg[]>([])
+  const idRef = useRef(0)
+  const excelOnceRef = useRef(false)
+  const recOnceRef = useRef(false)
+  function push(text: string) {
+    const id = ++idRef.current
+    setToasts((p) => [...p, { id, text }])
+    setTimeout(() => setToasts((p) => p.filter((t) => t.id !== id)), 6000)
+  }
+  useEffect(() => {
+    if (excelOnceRef.current) return
+    excelOnceRef.current = true
+    try { opts.excel() } catch { /* ignore */ }
+    push('測試結果 Excel 已下載到你的下載資料夾')
+    if (opts.recording) push('螢幕錄影處理中,完成後會自動下載…')
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!opts.recordingBlob || recOnceRef.current) return
+    recOnceRef.current = true
+    downloadBlob(opts.recordingBlob, `${opts.recordingBase}.webm`)
+    push('螢幕錄影已下載到你的下載資料夾')
+  }, [opts.recordingBlob]) // eslint-disable-line react-hooks/exhaustive-deps
+  return toasts
+}
+
 // ── 放聲思考逐字稿:瀏覽器 Web Speech API(免後端)──────────────────────────
 type ThinkAloud = {
   supported: boolean
@@ -792,7 +929,7 @@ function SurveySection({ heading, taskSurveys, postTestAnswers }: { heading: str
 }
 
 // ── 單版本結果頁 ─────────────────────────────────────────────────────────────
-function SingleResultScreen({ project, run, tester, postTestAnswers, onReset }: { project: UTProject<any>; run: VariantRun; tester: string; postTestAnswers: SurveyAnswer[]; onReset: () => void }) {
+function SingleResultScreen({ project, run, tester, postTestAnswers, recording, recordingBlob, onReset }: { project: UTProject<any>; run: VariantRun; tester: string; postTestAnswers: SurveyAnswer[]; recording: boolean; recordingBlob: Blob | null; onReset: () => void }) {
   function excel() {
     const rows: (string | number)[][] = [
       ['測試名稱', project.title],
@@ -830,7 +967,11 @@ function SingleResultScreen({ project, run, tester, postTestAnswers, onReset }: 
     copyToClipboard(lines.join('\n'))
   }
 
+  // 到摘要頁:自動下載 Excel,並在錄影就緒後自動下載 webm,各跳 toast。
+  const toasts = useAutoDeliver({ excel, recordingBase: `UT-${project.id}-${run.variant}-${tester || 'anon'}`, recording, recordingBlob })
+
   return (
+    <>
     <ResultShell badge={`測試結果 · 版本 ${run.variant}`}>
       <h1 className="text-neutral-9" style={{ fontSize: 22, fontWeight: 600, lineHeight: '130%' }}>{project.title}</h1>
 
@@ -859,6 +1000,8 @@ function SingleResultScreen({ project, run, tester, postTestAnswers, onReset }: 
       <Notice className="mt-5" variant="info" title="把結果交回給研究人員" description="可匯出 Excel 或複製純文字,貼到你們彙整結果的試算表 / 文件。" />
       <ExportBar onExcel={excel} onCopyText={text} onReset={onReset} />
     </ResultShell>
+    <ToastHost toasts={toasts} />
+    </>
   )
 }
 
@@ -886,7 +1029,7 @@ function thinkAloudNote(runs: VariantRun[]) {
   }).join(' / ') + '。'
 }
 
-function CombinedResultScreen({ project, runs, tester, postTestAnswers, onReset }: { project: UTProject<any>; runs: VariantRun[]; tester: string; postTestAnswers: SurveyAnswer[]; onReset: () => void }) {
+function CombinedResultScreen({ project, runs, tester, postTestAnswers, recording, recordingBlob, onReset }: { project: UTProject<any>; runs: VariantRun[]; tester: string; postTestAnswers: SurveyAnswer[]; recording: boolean; recordingBlob: Blob | null; onReset: () => void }) {
   const conclusion = concludeMulti(runs)
   const taNote = thinkAloudNote(runs)
   const variantsLabel = runs.map((r) => r.variant).join(' vs ')
@@ -966,7 +1109,11 @@ function CombinedResultScreen({ project, runs, tester, postTestAnswers, onReset 
     </div>
   )
 
+  // 到摘要頁:自動下載 Excel,並在錄影就緒後自動下載 webm,各跳 toast。
+  const toasts = useAutoDeliver({ excel, recordingBase: `UT-${project.id}-${runs.map((r) => r.variant).join('')}-${tester || 'anon'}`, recording, recordingBlob })
+
   return (
+    <>
     <ResultShell badge={`綜合測試結果 · 版本 ${variantsLabel}`}>
       <h1 className="text-neutral-9" style={{ fontSize: 22, fontWeight: 600, lineHeight: '130%' }}>{project.title}</h1>
       <div className="mt-2 text-neutral-8" style={{ fontSize: 13 }}>
@@ -998,17 +1145,24 @@ function CombinedResultScreen({ project, runs, tester, postTestAnswers, onReset 
       <Notice className="mt-5" variant="info" title="把綜合結果交回給研究人員" description="可匯出 Excel(含各版逐項比較、結論、逐字稿、問卷)或複製純文字。" />
       <ExportBar onExcel={excel} onCopyText={text} onReset={onReset} />
     </ResultShell>
+    <ToastHost toasts={toasts} />
+    </>
   )
 }
 
 // ── 對外:單版本流程(VersionA / VersionB 用)────────────────────────────────
-export function UsabilityTest<A>({ project, variant, password = '0000' }: { project: UTProject<A>; variant: string; password?: string }) {
+export function UsabilityTest<A>({ project, variant, password = '0000', record = false }: { project: UTProject<A>; variant: string; password?: string; record?: boolean }) {
   const [unlocked, setUnlocked] = useState(false)
   const [phase, setPhase] = useState<'intro' | 'running' | 'posttest' | 'done'>('intro')
   const [tester, setTester] = useState('')
   const [run, setRun] = useState<VariantRun | null>(null)
   const [postTest, setPostTest] = useState<SurveyAnswer[]>([])
+  const [recordingBlob, setRecordingBlob] = useState<Blob | null>(null)
   const postTestQs = project.postTestSurvey ?? []
+  const rec = useScreenRecorder()
+
+  // 進入摘要頁時停止錄製,取回 webm blob。
+  useEffect(() => { if (phase === 'done') rec.stop().then(setRecordingBlob) }, [phase]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!unlocked) return <PasswordGate password={password} onUnlock={() => setUnlocked(true)} />
 
@@ -1017,10 +1171,10 @@ export function UsabilityTest<A>({ project, variant, password = '0000' }: { proj
       <IntroScreen
         project={project}
         badge={`Usability Test · 版本 ${variant}`}
-        note={<>本次共 <b>{project.tasks.length}</b> 項任務,進行中右下角會出現任務指示框。<b>必須實際完成</b>指定操作才算成功。</>}
+        note={<>本次共 <b>{project.tasks.length}</b> 項任務,進行中右下角會出現任務指示框。<b>必須實際完成</b>指定操作才算成功。{record && <><br />開始後會請你<b>分享畫面</b>以錄製測試過程(畫面 + 你的講話聲),結束自動下載。</>}</>}
         tester={tester}
         onTesterChange={setTester}
-        onStart={() => { if (tester.trim()) setPhase('running') }}
+        onStart={() => { if (tester.trim()) { if (record) rec.start(); setPhase('running') } }}
       />
     )
   }
@@ -1038,21 +1192,26 @@ export function UsabilityTest<A>({ project, variant, password = '0000' }: { proj
       />
     )
   }
-  return <SingleResultScreen project={project} run={run!} tester={tester} postTestAnswers={postTest} onReset={() => { setPhase('intro'); setTester(''); setRun(null); setPostTest([]) }} />
+  return <SingleResultScreen project={project} run={run!} tester={tester} postTestAnswers={postTest} recording={record && rec.started} recordingBlob={recordingBlob} onReset={() => { setPhase('intro'); setTester(''); setRun(null); setPostTest([]); setRecordingBlob(null) }} />
 }
 
 // ── 對外:多版本綜合流程(A→B→C…,依序跑完給綜合結論)──────────────────────
-export function UsabilityTestAB<A>({ project, order = ['A', 'B'], password = '0000' }: { project: UTProject<A>; order?: string[]; password?: string }) {
+export function UsabilityTestAB<A>({ project, order = ['A', 'B'], password = '0000', record = false }: { project: UTProject<A>; order?: string[]; password?: string; record?: boolean }) {
   const [unlocked, setUnlocked] = useState(false)
   const [phase, setPhase] = useState<'intro' | 'run' | 'interstitial' | 'posttest' | 'done'>('intro')
   const [tester, setTester] = useState('')
   const [vIndex, setVIndex] = useState(0)
   const [runs, setRuns] = useState<VariantRun[]>([])
   const [postTest, setPostTest] = useState<SurveyAnswer[]>([])
+  const [recordingBlob, setRecordingBlob] = useState<Blob | null>(null)
   const postTestQs = project.postTestSurvey ?? []
+  const rec = useScreenRecorder()
 
-  function reset() { setPhase('intro'); setTester(''); setVIndex(0); setRuns([]); setPostTest([]) }
+  function reset() { setPhase('intro'); setTester(''); setVIndex(0); setRuns([]); setPostTest([]); setRecordingBlob(null) }
   const orderLabel = order.map((v) => `版本 ${v}`).join(' → ')
+
+  // 進入摘要頁時停止錄製,取回 webm blob。
+  useEffect(() => { if (phase === 'done') rec.stop().then(setRecordingBlob) }, [phase]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!unlocked) return <PasswordGate password={password} onUnlock={() => setUnlocked(true)} />
 
@@ -1061,10 +1220,10 @@ export function UsabilityTestAB<A>({ project, order = ['A', 'B'], password = '00
       <IntroScreen
         project={project}
         badge={`Usability Test · 綜合測試 ${order.join(' → ')}`}
-        note={<>你會<b>依序體驗 {order.length} 個版本({orderLabel})</b>,每版各 <b>{project.tasks.length}</b> 項任務。全部完成後會看到各版比較與綜合結論。</>}
+        note={<>你會<b>依序體驗 {order.length} 個版本({orderLabel})</b>,每版各 <b>{project.tasks.length}</b> 項任務。全部完成後會看到各版比較與綜合結論。{record && <><br />開始後會請你<b>分享畫面</b>以錄製測試過程(畫面 + 你的講話聲),結束自動下載。</>}</>}
         tester={tester}
         onTesterChange={setTester}
-        onStart={() => { if (tester.trim()) setPhase('run') }}
+        onStart={() => { if (tester.trim()) { if (record) rec.start(); setPhase('run') } }}
       />
     )
   }
@@ -1112,5 +1271,5 @@ export function UsabilityTestAB<A>({ project, order = ['A', 'B'], password = '00
       />
     )
   }
-  return <CombinedResultScreen project={project} runs={runs} tester={tester} postTestAnswers={postTest} onReset={reset} />
+  return <CombinedResultScreen project={project} runs={runs} tester={tester} postTestAnswers={postTest} recording={record && rec.started} recordingBlob={recordingBlob} onReset={reset} />
 }
