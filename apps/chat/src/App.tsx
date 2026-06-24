@@ -427,7 +427,7 @@ const INITIAL_ROOMS: Room[] = [
     type: 'general',
     title: 'IT Sales - Table格式範例',
     section: 'chats',
-    unread: true,
+    unread: false,
     memberKeys: ['guanyu', 'kenji', 'yui', 'shinichi'],
     messages: [
       {
@@ -1937,6 +1937,8 @@ export type ChatAction =
   | { type: 'mute-room'; roomId: string; roomTitle: string }
   | { type: 'open-thread'; roomId: string; messageId: string }
   | { type: 'thread-reply'; roomId: string; messageId: string }
+  | { type: 'open-settings' }
+  | { type: 'toggle-preview'; value: boolean }
 
 export default function App({
   config,
@@ -2015,7 +2017,7 @@ export default function App({
   return (
     <TooltipProvider delayDuration={400} skipDelayDuration={200}>
       <div className="flex h-screen w-full overflow-hidden bg-canvas text-foreground">
-        <NavRail unreadCount={unreadCount} onOpenSettings={() => setSettingsOpen(true)} />
+        <NavRail unreadCount={unreadCount} onOpenSettings={() => { setSettingsOpen(true); onAction?.({ type: 'open-settings' }) }} />
         {listOpen && (
           <ChatList
             rooms={rooms}
@@ -2050,7 +2052,7 @@ export default function App({
         open={settingsOpen}
         onOpenChange={setSettingsOpen}
         showPreview={showPreview}
-        onConfirm={setShowPreview}
+        onConfirm={(v) => { setShowPreview(v); onAction?.({ type: 'toggle-preview', value: v }) }}
       />
     </TooltipProvider>
   )

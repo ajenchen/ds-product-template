@@ -1,5 +1,10 @@
+import { fileURLToPath } from 'node:url'
 import type { StorybookConfig } from '@storybook/react-vite'
 import preset from '@qijenchen/storybook-config/preset'
+
+// 把可重用測試引擎 @imethan0254/ut-model-a 在 monorepo 內直接 resolve 到 source(免 build dist),
+// dev / Storybook 改動即時生效;外部消費端則走 package.json exports 的 dist。
+const utModelASource = fileURLToPath(new URL('../packages/ut-model-a/src/index.tsx', import.meta.url))
 
 const config: StorybookConfig = {
   ...preset,
@@ -16,6 +21,8 @@ const config: StorybookConfig = {
     const tailwindcss = (await import('@tailwindcss/vite')).default
     vite.plugins = vite.plugins || []
     vite.plugins.push(tailwindcss())
+    vite.resolve = vite.resolve || {}
+    vite.resolve.alias = { ...(vite.resolve.alias as Record<string, string>), '@imethan0254/ut-model-a': utModelASource }
     return vite
   },
 }

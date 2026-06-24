@@ -19,6 +19,9 @@
     "paths": {
       "@/*": [
         "./src/*"
+      ],
+      "@imethan0254/ut-model-a": [
+        "../../packages/ut-model-a/src/index.tsx"
       ]
     }
   },

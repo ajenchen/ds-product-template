@@ -16,10 +16,15 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "baseUrl": ".",
+    "paths": {
+      "@imethan0254/ut-model-a": ["packages/ut-model-a/src/index.tsx"]
+    }
   },
   "include": [
     "apps/*/src",
+    "packages/*/src",
     "scripts"
   ],
   "exclude": [
