@@ -719,7 +719,7 @@ function SurveyStep({
   }
 
   const card = (
-    <div className="max-h-full w-full max-w-[560px] overflow-auto rounded-xl border border-neutral-5 bg-surface p-8 shadow-lg">
+    <div className="w-full max-w-[560px] rounded-xl border border-neutral-5 bg-surface p-8 shadow-lg">
       <Chip tone="info" className="mb-3">{badge}</Chip>
       <h2 className="text-neutral-9" style={{ fontSize: 18, fontWeight: 600, lineHeight: '130%' }}>{title}</h2>
       <div className="mt-5 space-y-6">
@@ -732,9 +732,13 @@ function SurveyStep({
   )
 
   if (presentation === 'overlay') {
-    return <div className="fixed inset-0 z-[1100] flex items-center justify-center p-6" style={{ backgroundColor: 'rgba(0,0,0,0.32)' }}>{card}</div>
+    return (
+      <div className="fixed inset-0 z-[1100] overflow-y-auto" style={{ backgroundColor: 'rgba(0,0,0,0.32)' }}>
+        <div className="flex min-h-full w-full items-center justify-center p-6">{card}</div>
+      </div>
+    )
   }
-  return <div className="flex h-screen w-full items-center justify-center bg-canvas p-6">{card}</div>
+  return <CenterScroll>{card}</CenterScroll>
 }
 
 // ── 問卷:結果頁的作答清單 ──────────────────────────────────────────────────
@@ -842,6 +846,15 @@ function RunPhase<A>({ project, variant, onDone }: { project: UTProject<A>; vari
   )
 }
 
+// 置中但可捲動的全螢幕容器:內容比視窗高時,頂部仍可捲到(避免 flex 置中把頂端裁掉)。
+function CenterScroll({ children }: { children: ReactNode }) {
+  return (
+    <div className="h-screen w-full overflow-y-auto bg-canvas">
+      <div className="flex min-h-full w-full items-center justify-center p-6">{children}</div>
+    </div>
+  )
+}
+
 // ── 密碼閘門 ────────────────────────────────────────────────────────────────
 function PasswordGate({ password, lang, onUnlock }: { password: string; lang: Lang; onUnlock: () => void }) {
   const t = tr(lang)
@@ -852,7 +865,7 @@ function PasswordGate({ password, lang, onUnlock }: { password: string; lang: La
     else setErr(true)
   }
   return (
-    <div className="flex h-screen w-full items-center justify-center bg-canvas p-6">
+    <CenterScroll>
       <div className="w-full max-w-[400px] rounded-xl border border-neutral-5 bg-surface p-8 text-center shadow-lg">
         <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full" style={{ backgroundColor: 'var(--color-info-subtle)' }}>
           <Lock size={22} style={{ color: 'var(--color-info-text)' }} />
@@ -871,7 +884,7 @@ function PasswordGate({ password, lang, onUnlock }: { password: string; lang: La
         {err && <p className="mt-2" style={{ fontSize: 12, color: 'var(--color-error-text)' }}>{t.pwError}</p>}
         <Button variant="primary" className="mt-4 w-full" disabled={!val} onClick={submit}>{t.pwEnter}</Button>
       </div>
-    </div>
+    </CenterScroll>
   )
 }
 
@@ -919,7 +932,7 @@ function IntroScreen({
 }) {
   const t = tr(lang)
   return (
-    <div className="flex h-screen w-full items-center justify-center bg-canvas p-6">
+    <CenterScroll>
       <div className="w-full max-w-[560px] rounded-xl border border-neutral-5 bg-surface p-8 shadow-lg">
         <div className="mb-3 flex items-center justify-between">
           <Chip tone="info">{badge}</Chip>
@@ -970,7 +983,7 @@ function IntroScreen({
           {t.startBtn}
         </Button>
       </div>
-    </div>
+    </CenterScroll>
   )
 }
 
@@ -1109,12 +1122,12 @@ function ExportBar({ onExcel, onCopyText, onReset }: { onExcel: () => void; onCo
 
 function ResultShell({ badge, children }: { badge: string; children: ReactNode }) {
   return (
-    <div className="flex h-screen w-full items-center justify-center bg-canvas p-6">
-      <div className="max-h-full w-full max-w-[640px] overflow-auto rounded-xl border border-neutral-5 bg-surface p-8 shadow-lg">
+    <CenterScroll>
+      <div className="w-full max-w-[640px] rounded-xl border border-neutral-5 bg-surface p-8 shadow-lg">
         <Chip tone="info" className="mb-3">{badge}</Chip>
         {children}
       </div>
-    </div>
+    </CenterScroll>
   )
 }
 
@@ -1492,7 +1505,7 @@ export function UsabilityTestAB<A>({ project, order = ['A', 'B'], password = '00
     const doneV = order[vIndex]
     const nextV = order[vIndex + 1]
     content = (
-      <div className="flex h-screen w-full items-center justify-center bg-canvas p-6">
+      <CenterScroll>
         <div className="w-full max-w-[480px] rounded-xl border border-neutral-5 bg-surface p-8 text-center shadow-lg">
           <Chip tone="success" className="mb-3">{t.variantDone(doneV, vIndex + 1, order.length)}</Chip>
           <h2 className="text-neutral-9" style={{ fontSize: 18, fontWeight: 600 }}>{t.nextUp(nextV)}</h2>
@@ -1501,7 +1514,7 @@ export function UsabilityTestAB<A>({ project, order = ['A', 'B'], password = '00
             {t.startVariant(nextV)}
           </Button>
         </div>
-      </div>
+      </CenterScroll>
     )
   } else if (phase === 'posttest') {
     content = <SurveyStep badge={t.postTestBadge} title={t.postTestTitle} questions={postTestQs} submitLabel={t.postTestSubmit} onSubmit={(a) => { setPostTest(a); setPhase('done') }} />
