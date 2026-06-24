@@ -3,104 +3,88 @@ import { UsabilityTest, UsabilityTestAB, type UTProject } from '@imethan0254/ut-
 import { chatVariant, type ChatAction } from './chatAdapter'
 
 // ── UT 專案定義:Chat List Preview Message Display Preferences ────────────────
-// 驗證「聊天列表是否顯示訊息預覽」對使用者快速定位對話的影響。
-// A = 顯示預覽(基底預設) / B = 精簡列表(不顯示預覽) / C = 精簡列表 + 多人聊天室字母頭像。
-//
-// 每個任務的 check() 依「使用者實際操作」判定成功/失敗 —— 光按「完成」不算成功。
-// 任務後 / 測試後另以「問卷」收主觀感受與開放意見(模型 A 的 survey 層)。
+// 雙語(zh/en):所有 title / goal / instructions / tasks / variants / survey 皆以
+// { zh, en } 提供;受測者可在測試說明頁切語言。引擎自身文字也會同步切換。
+// A = 顯示預覽 / B = 精簡列表 / C = 精簡列表 + 多人聊天室字母頭像。
+const seqQuestion = {
+  id: 'seq',
+  questionType: 'singleEase' as const,
+  prompt: { zh: '整體而言,這個任務有多容易或多困難?', en: 'Overall, how easy or difficult was this task?' },
+  scalePoints: 7,
+}
+
 const chatListPreviewProject: UTProject<ChatAction> = {
   id: 'chat-list-preview',
   title: 'UT – Chat List Preview Message Display Preferences',
-  goal: '了解聊天列表「是否顯示最後一則訊息預覽」對使用者快速找到並進入正確對話的影響。',
+  goal: {
+    zh: '了解聊天列表「是否顯示最後一則訊息預覽」對使用者快速找到並進入正確對話的影響。',
+    en: 'Understand how showing (or hiding) the last-message preview in the chat list affects how quickly users find and open the right conversation.',
+  },
   instructions: [
-    '這是一次易用性測試,我們測的是介面、不是你 — 沒有對錯,依直覺操作即可。',
-    '過程中請盡量講出你的想法(放聲思考)。',
-    '右下角會出現任務指示;請「實際完成」該操作後再按「完成,下一步」。',
-    '每個任務做完會跳出一個簡短問卷,最後還有整體問卷。',
-    '任務指示框可拖曳移動,避免擋到要操作的地方。',
+    { zh: '這是一次易用性測試,我們測的是介面、不是你 — 沒有對錯,依直覺操作即可。', en: "This is a usability test — we're testing the interface, not you. There are no right answers; just go with your instincts." },
+    { zh: '過程中請盡量講出你的想法(放聲思考)。', en: 'Please think aloud as much as you can.' },
+    { zh: '右下角會出現任務指示;請「實際完成」該操作後再按「完成,下一步」。', en: "A task panel appears at the bottom-right; actually complete the action before pressing 'Done, next'." },
+    { zh: '每個任務做完會跳出一個簡短問卷,最後還有整體問卷。', en: 'A short survey pops up after each task, with an overall survey at the end.' },
+    { zh: '任務指示框可拖曳移動,避免擋到要操作的地方。', en: 'You can drag the task panel out of the way.' },
   ],
-  // 任務後問卷:套用到所有任務(單一任務可用 task.postTask 覆寫)。
-  postTaskSurvey: [
-    {
-      id: 'seq',
-      questionType: 'singleEase',
-      prompt: '整體而言,這個任務有多容易或多困難?',
-      scalePoints: 7,
-      anchors: { min: '非常困難', max: '非常容易' },
-    },
-  ],
-  // 整場測試結束後問卷:開放題引導受測者表達整體觀點。
+  postTaskSurvey: [seqQuestion],
   postTestSurvey: [
-    { id: 'like', questionType: 'writtenResponse', prompt: '這次體驗中你最喜歡的部分是什麼?', minChars: 15 },
-    { id: 'change', questionType: 'writtenResponse', prompt: '如果可以改一件事,你會改什麼?', minChars: 15 },
-    { id: 'unexpected', questionType: 'writtenResponse', prompt: '過程中有沒有遇到任何意外或預期外的狀況?', required: false },
+    { id: 'like', questionType: 'writtenResponse', prompt: { zh: '這次體驗中你最喜歡的部分是什麼?', en: 'What did you like most about this experience?' }, minChars: 15 },
+    { id: 'change', questionType: 'writtenResponse', prompt: { zh: '如果可以改一件事,你會改什麼?', en: 'If you could change one thing, what would it be?' }, minChars: 15 },
+    { id: 'unexpected', questionType: 'writtenResponse', prompt: { zh: '過程中有沒有遇到任何意外或預期外的狀況?', en: 'Did anything unexpected happen during the process?' }, required: false },
   ],
   tasks: [
     {
       id: 't1',
-      title: '找到並開啟「IT Sales - Table格式範例」這個聊天室。',
-      hint: '可使用列表上方的搜尋。',
+      title: { zh: '找到並開啟「IT Sales - Table格式範例」這個聊天室。', en: "Find and open the 'IT Sales - Table format example' chat." },
+      hint: { zh: '可使用列表上方的搜尋。', en: 'You can use the search at the top of the list.' },
       check: (acts) =>
         acts.some((a) => a.type === 'open-room' && a.roomId === 'semi-sales')
           ? { ok: true }
-          : { ok: false, reason: '未開啟「IT Sales - Table格式範例」聊天室' },
+          : { ok: false, reason: { zh: '未開啟「IT Sales - Table格式範例」聊天室', en: "Did not open the 'IT Sales - Table format example' chat" } },
     },
     {
       id: 't2',
-      title: '找出一個有未讀訊息的聊天室,並進入它。',
-      hint: '注意列表上的未讀標記。',
+      title: { zh: '找出一個有未讀訊息的聊天室,並進入它。', en: 'Find a chat with unread messages and open it.' },
+      hint: { zh: '注意列表上的未讀標記。', en: 'Look for the unread markers in the list.' },
       check: (acts) =>
         acts.some((a) => a.type === 'open-room' && a.unread)
           ? { ok: true }
-          : { ok: false, reason: '未開啟任何「有未讀訊息」的聊天室' },
-      // 這個任務後多問一題開放題(覆寫 project.postTaskSurvey):SEQ + 開放意見。
+          : { ok: false, reason: { zh: '未開啟任何「有未讀訊息」的聊天室', en: 'Did not open any chat with unread messages' } },
       postTask: [
-        {
-          id: 'seq',
-          questionType: 'singleEase',
-          prompt: '整體而言,這個任務有多容易或多困難?',
-          scalePoints: 7,
-          anchors: { min: '非常困難', max: '非常容易' },
-        },
-        {
-          id: 't2-open',
-          questionType: 'writtenResponse',
-          prompt: '你是怎麼判斷哪些聊天室有未讀訊息的?',
-          required: false,
-        },
+        seqQuestion,
+        { id: 't2-open', questionType: 'writtenResponse', prompt: { zh: '你是怎麼判斷哪些聊天室有未讀訊息的?', en: 'How did you tell which chats had unread messages?' }, required: false },
       ],
     },
     {
       id: 't3',
-      title: '把任意一個聊天室設為靜音(Mute)。',
-      hint: '在聊天室列上 hover 或開啟更多選單。',
+      title: { zh: '把任意一個聊天室設為靜音(Mute)。', en: 'Mute any one chat.' },
+      hint: { zh: '在聊天室列上 hover 或開啟更多選單。', en: 'Hover a chat row or open its more menu.' },
       check: (acts) =>
         acts.some((a) => a.type === 'mute-room')
           ? { ok: true }
-          : { ok: false, reason: '未將任何聊天室設為靜音' },
+          : { ok: false, reason: { zh: '未將任何聊天室設為靜音', en: 'Did not mute any chat' } },
     },
     {
       id: 't4',
-      title: '開啟任一則訊息的討論串(Thread)並回覆一句話。',
-      hint: '在訊息上找到「Reply in thread」,輸入文字後送出。',
+      title: { zh: '開啟任一則訊息的討論串(Thread)並回覆一句話。', en: 'Open a thread on any message and reply once.' },
+      hint: { zh: '在訊息上找到「Reply in thread」,輸入文字後送出。', en: "Find 'Reply in thread' on a message, type and send." },
       check: (acts) => {
         const opened = acts.some((a) => a.type === 'open-thread')
         const replied = acts.some((a) => a.type === 'thread-reply')
         if (opened && replied) return { ok: true }
-        if (!opened) return { ok: false, reason: '未開啟任何討論串(Thread)' }
-        return { ok: false, reason: '已開啟討論串但未送出回覆' }
+        if (!opened) return { ok: false, reason: { zh: '未開啟任何討論串(Thread)', en: 'Did not open any thread' } }
+        return { ok: false, reason: { zh: '已開啟討論串但未送出回覆', en: 'Opened a thread but did not send a reply' } }
       },
     },
   ],
   variants: {
-    A: chatVariant('版本 A:列表顯示訊息預覽', { initialShowPreview: true }),
-    B: chatVariant('版本 B:精簡列表(不顯示訊息預覽)', { initialShowPreview: false }),
-    // 版本 C:不顯示訊息預覽;多人(general)聊天室頭像改為室名首字母 + 隨機色;DM 不變。
-    C: chatVariant('版本 C:精簡列表 + 多人聊天室字母頭像', { initialShowPreview: false, groupAvatarMode: 'initial' }),
+    A: chatVariant({ zh: '版本 A:列表顯示訊息預覽', en: 'Version A: list shows message preview' }, { initialShowPreview: true }),
+    B: chatVariant({ zh: '版本 B:精簡列表(不顯示訊息預覽)', en: 'Version B: compact list (no message preview)' }, { initialShowPreview: false }),
+    C: chatVariant({ zh: '版本 C:精簡列表 + 多人聊天室字母頭像', en: 'Version C: compact list + initial avatars for group chats' }, { initialShowPreview: false, groupAvatarMode: 'initial' }),
   },
 }
 
-// 各 story 各自獨立網址,完全不影響 base(apps-chat-chat--default)。
 const meta: Meta<typeof UsabilityTest> = {
   title: 'UT/Chat List Preview Message Display Preferences',
   component: UsabilityTest,
@@ -109,11 +93,19 @@ const meta: Meta<typeof UsabilityTest> = {
 export default meta
 type Story = StoryObj<typeof UsabilityTest>
 
-// 綜合測試(推薦):依序跑版本 A → B → C,最後給三版比較與綜合結論。
-// record:測試開始錄製畫面+講話聲,摘要頁自動下載 webm + Excel。
+// 綜合測試:不同版本順序各一支,counterbalance 消除順序效應偏差(cyclic Latin square)。
+// record:錄製畫面+講話聲,摘要頁自動下載 webm + Excel。預設中文,測試說明頁可切 English。
 export const CombinedAB: Story = {
   name: '綜合測試 A→B→C(含結論)',
   render: () => <UsabilityTestAB project={chatListPreviewProject} order={['A', 'B', 'C']} record />,
+}
+export const CombinedBCA: Story = {
+  name: '綜合測試 B→C→A(counterbalance)',
+  render: () => <UsabilityTestAB project={chatListPreviewProject} order={['B', 'C', 'A']} record />,
+}
+export const CombinedCAB: Story = {
+  name: '綜合測試 C→A→B(counterbalance)',
+  render: () => <UsabilityTestAB project={chatListPreviewProject} order={['C', 'A', 'B']} record />,
 }
 
 // 單獨跑某一版(需要時用)。

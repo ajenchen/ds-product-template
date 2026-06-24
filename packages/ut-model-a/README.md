@@ -117,6 +117,35 @@ const project: UTProject<MyAction> = {
 問卷回應會進結果頁,並一併匯出 Excel / 文字。文案請維持中性、非引導(要「你的第一印象是什麼?」不要「你喜歡嗎?」),開放題建議單場 ≤ 1–2 題避免疲勞。
 > roadmap(尚未做):ratingScale / likert / nps(含計分) / multipleChoice / matrix / SUS 題組 / 跳題邏輯 / 期望vs體驗散佈圖。
 
+## 雙語(中文 / English)
+
+測試說明頁右上角有語言切換,**預設中文**,切 English 後整個流程(引擎文字 + 你的內容)都變英文。
+
+- 引擎自身文字內建 zh/en。
+- 你的內容用 `Localized` 提供雙語:`string`(不分語言)或 `{ zh, en }`。
+  ```ts
+  title: { zh: '我的測試', en: 'My test' }
+  tasks: [{ title: { zh: '…', en: '…' }, check: (a) => ok ? { ok: true } : { ok: false, reason: { zh: '…', en: '…' } } }]
+  variants: { A: { label: { zh: '版本 A', en: 'Version A' }, render } }
+  ```
+- 預設語言可用 `defaultLang="en"` 覆寫(預設 `'zh'`)。
+- SEQ 量表錨點不給就用引擎內建雙語(非常困難/非常容易 ↔ Very difficult/Very easy)。
+
+## 摘要頁分析:做失敗卻自評偏容易(false-easy)
+
+結果頁會特別用警示區塊標出「實際**失敗**、但任務後 SEQ 自評落在偏『容易』(分數 / 量表 ≥ 0.7)」的任務 —— 代表受測者誤以為自己輕鬆完成,最值得回放 / 訪談。也會寫進 Excel / 文字匯出。需該任務有 `singleEase` 任務後問卷才偵測得到。
+
+## 消除順序效應(counterbalancing)
+
+`counterbalancedOrders(variants)` 產生 cyclic Latin square 的順序集合(每版在每位置各一次),每個順序做成一支綜合 story 即可平衡 order bias:
+
+```ts
+import { counterbalancedOrders } from '@imethan0254/ut-model-a'
+counterbalancedOrders(['A', 'B'])      // [['A','B'], ['B','A']]
+counterbalancedOrders(['A', 'B', 'C']) // [['A','B','C'], ['B','C','A'], ['C','A','B']]
+// 各順序:<UsabilityTestAB project={p} order={ord} record />
+```
+
 ## 設計原則
 
 引擎對「被測 prototype」完全不可知 —— 它只認識 `render()` 與 `onAction`。

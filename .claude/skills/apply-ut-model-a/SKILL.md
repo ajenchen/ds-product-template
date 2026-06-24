@@ -121,6 +121,12 @@ postTestSurvey: [
 
 指引:文案中性非引導;量表預設 7 點;開放題單場建議 ≤ 1–2 題避免疲勞;`post-task` 題綁該任務、`post-test` 收整體。問卷回應會進結果頁 + Excel/文字匯出。
 
+## 4c. 雙語 / 順序平衡 / false-easy(產出時預設套用)
+
+- **雙語**:所有內容欄位(title / goal / instructions / task.title / hint / check 的 reason / variant.label / survey prompt)請用 `{ zh, en }` 提供。測試說明頁自帶語言切換,預設中文。引擎文字已內建 zh/en,SEQ 錨點不給就用內建雙語。
+- **消除順序效應**:用 `counterbalancedOrders(variants)` 產生順序集合,每個順序做成一支綜合 story(例:A→B→C、B→C→A、C→A→B),全部加 `record`。
+- **false-easy 分析**:只要任務後問卷含 `singleEase`(SEQ),結果頁就會自動標出「做失敗卻自評偏容易」的任務 —— 不需額外設定。
+
 ## 5. 驗證
 
 - `npm run typecheck` 綠
