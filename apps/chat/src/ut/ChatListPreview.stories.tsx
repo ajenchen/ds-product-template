@@ -21,7 +21,6 @@ const chatListPreviewProject: UTProject = {
     {
       id: 't1',
       title: '找到並開啟「IT Sales - Table格式範例」這個聊天室。',
-      hint: '可使用列表上方的搜尋。',
       check: (acts) =>
         acts.some((a) => a.type === 'open-room' && a.roomId === 'semi-sales')
           ? { ok: true }
@@ -39,7 +38,6 @@ const chatListPreviewProject: UTProject = {
     {
       id: 't3',
       title: '把任意一個聊天室設為靜音(Mute)。',
-      hint: '在聊天室列上 hover 或開啟更多選單。',
       check: (acts) =>
         acts.some((a) => a.type === 'mute-room')
           ? { ok: true }
@@ -56,6 +54,15 @@ const chatListPreviewProject: UTProject = {
         if (!opened) return { ok: false, reason: '未開啟任何討論串(Thread)' }
         return { ok: false, reason: '已開啟討論串但未送出回覆' }
       },
+    },
+    {
+      id: 't5',
+      title: '找到可以開關「聊天列表顯示最新訊息預覽(Show message previews for chats)」的設定,把它調成你個人比較喜歡的狀態;並請說出:有沒有顯示最新訊息對你的差別、以及你為什麼偏好這樣設定。',
+      hint: '一邊操作一邊放聲說出你的想法(會被錄成逐字稿);偏好原因會記錄在你的逐字稿與重點裡。',
+      check: (acts) =>
+        acts.some((a) => a.type === 'open-settings' || a.type === 'toggle-preview')
+          ? { ok: true }
+          : { ok: false, reason: '未找到 / 未開啟「顯示訊息預覽」的設定' },
     },
   ],
   variants: {
