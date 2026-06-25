@@ -932,6 +932,7 @@ function ChatList({
   onToggleMute,
   onToggleFavorite,
   groupAvatarMode = 'icon',
+  onSearch,
 }: {
   rooms: Room[]
   activeId: string
@@ -945,6 +946,7 @@ function ChatList({
   onToggleMute: (id: string) => void
   onToggleFavorite: (id: string) => void
   groupAvatarMode?: 'icon' | 'initial'
+  onSearch?: () => void
 }) {
   const [openFav, setOpenFav] = useState(true)
   const [openChats, setOpenChats] = useState(true)
@@ -977,7 +979,7 @@ function ChatList({
         <h2 className="flex-1 truncate" style={{ fontSize: 16, fontWeight: 500, lineHeight: '130%', color: 'var(--color-neutral-9)' }}>Chats</h2>
         <div className="flex items-center gap-2">
           <AddPopover />
-          <ListBtn icon={Search} label="Search" />
+          <ListBtn icon={Search} label="Search" onClick={onSearch} />
           <ListBtn icon={PanelLeftClose} label="Collapse sidebar" onClick={onCollapse} />
         </div>
       </header>
@@ -1285,13 +1287,27 @@ function MessageBubble({
   onOpenThread,
   room,
   isInThread,
+  readOnly,
+  flashToken,
 }: {
   message: Message
   isLastMine: boolean
   onOpenThread: (m: Message) => void
   room: Room
   isInThread?: boolean
+  // Search-preview panel: hides the reaction bar and disables thread navigation.
+  readOnly?: boolean
+  // Bumping this (to any truthy, distinct value) re-triggers the one-time indigo-6
+  // background flash on this bubble — used when jumping to a message from search.
+  flashToken?: number
 }) {
+  const [flashing, setFlashing] = useState(false)
+  useEffect(() => {
+    if (!flashToken) return
+    setFlashing(true)
+    const t = setTimeout(() => setFlashing(false), 1200)
+    return () => clearTimeout(t)
+  }, [flashToken])
   const mine = message.author === 'me'
   const author = mine ? null : PEOPLE[message.author] ?? null
   const replyCount = message.threadMessages?.length ?? message.replies ?? 0
@@ -1310,11 +1326,11 @@ function MessageBubble({
   // fit), NOT fit-content — fit-content pulls a wide table's max-content and
   // overflows. min-w-0 lets it shrink below content so the table scrolls inside.
   const bubble = (
-    <div className="relative max-w-full min-w-0" style={isRepliedCopy ? { minWidth: REPLIED_LINK_MIN_W } : undefined}>
-      <ReactionBar onOpenThread={() => onOpenThread(message)} mine={mine} room={room} hideReplyInThread={isInThread} />
+    <div id={`msg-${message.id}`} className="relative max-w-full min-w-0" style={isRepliedCopy ? { minWidth: REPLIED_LINK_MIN_W } : undefined}>
+      {!readOnly && <ReactionBar onOpenThread={() => onOpenThread(message)} mine={mine} room={room} hideReplyInThread={isInThread} />}
       <div
-        className={`rounded-xl p-3 text-body max-w-full min-w-0 ${mine ? 'text-foreground' : 'bg-muted text-foreground'}`}
-        style={mine ? { backgroundColor: '#EBEEFF' } : undefined}
+        className={`rounded-xl p-3 text-body max-w-full min-w-0 transition-colors duration-700 ${mine ? 'text-foreground' : 'bg-muted text-foreground'}`}
+        style={{ backgroundColor: flashing ? 'var(--color-indigo-6)' : (mine ? '#EBEEFF' : undefined) }}
       >
         <p className="whitespace-pre-wrap break-words">{message.text}</p>
         {message.images && message.images.length > 0 && (
@@ -1408,9 +1424,9 @@ function MessageBubble({
       )}
       <button
         type="button"
-        className="flex items-center gap-1 hover:underline"
+        className={`flex items-center gap-1 ${readOnly ? 'cursor-default' : 'hover:underline'}`}
         style={{ color: 'var(--color-primary)' }}
-        onClick={() => onOpenThread(message)}
+        onClick={readOnly ? undefined : () => onOpenThread(message)}
       >
         <MessagesSquare size={16} style={{ color: 'var(--color-primary)' }} />
         <span style={{ fontSize: 12, fontWeight: 500, lineHeight: '130%', color: 'var(--color-primary)' }}>{replyCount} replies</span>
@@ -1437,8 +1453,8 @@ function MessageBubble({
       />
       <button
         type="button"
-        className="flex min-w-0 flex-1 items-center gap-1 hover:underline"
-        onClick={() => onOpenThread(repliedParent)}
+        className={`flex min-w-0 flex-1 items-center gap-1 ${readOnly ? 'cursor-default' : 'hover:underline'}`}
+        onClick={readOnly ? undefined : () => onOpenThread(repliedParent)}
       >
         <MessagesSquare size={16} className="shrink-0" style={{ color: 'var(--color-primary)' }} />
         <span className="min-w-0 truncate" style={{ fontSize: 12, fontWeight: 400, lineHeight: '130%', color: 'var(--color-neutral-7)' }}>
@@ -1567,25 +1583,32 @@ function getISOWeek(date: Date): number {
 
 const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
-// Today → "Today, W26" · Yesterday → "Yesterday, W26" · this week (other day)
-// → "Monday, W26" · this year (earlier) → "5/25, W22" · earlier year → "5/25, 2025, W22".
+// W<last digit of year><2-digit ISO week>, e.g. week 26 of 2026 → "W626".
+function weekLabel(target: Date): string {
+  const yearDigit = target.getFullYear() % 10
+  const week = String(getISOWeek(target)).padStart(2, '0')
+  return `W${yearDigit}${week}`
+}
+
+// Today → "Today, W626" · Yesterday → "Yesterday, W626" · this week (other day)
+// → "Monday, W626" · this year (earlier) → "5/25, W622" · earlier year → "5/25, 2025, W522".
 function formatDateDivider(target: Date, now: Date): string {
   const t = startOfDay(target)
   const n = startOfDay(now)
   const diffDays = Math.round((n.getTime() - t.getTime()) / 86400000)
   const week = getISOWeek(target)
-  if (diffDays === 0) return `Today, W${week}`
-  if (diffDays === 1) return `Yesterday, W${week}`
+  if (diffDays === 0) return `Today, ${weekLabel(target)}`
+  if (diffDays === 1) return `Yesterday, ${weekLabel(target)}`
   const sameWeek = diffDays > 0 && diffDays < 7 && getISOWeek(now) === week && now.getFullYear() === target.getFullYear()
-  if (sameWeek) return `${WEEKDAY_NAMES[target.getDay()]}, W${week}`
+  if (sameWeek) return `${WEEKDAY_NAMES[target.getDay()]}, ${weekLabel(target)}`
   const md = `${target.getMonth() + 1}/${target.getDate()}`
-  if (target.getFullYear() === now.getFullYear()) return `${md}, W${week}`
-  return `${md}, ${target.getFullYear()}, W${week}`
+  if (target.getFullYear() === now.getFullYear()) return `${md}, ${weekLabel(target)}`
+  return `${md}, ${target.getFullYear()}, ${weekLabel(target)}`
 }
 
 function DateDivider({ label }: { label: string }) {
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-3 px-10">
       <div className="h-px flex-1" style={{ backgroundColor: 'var(--color-neutral-4)' }} />
       <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--color-neutral-7)' }}>{label}</span>
       <div className="h-px flex-1" style={{ backgroundColor: 'var(--color-neutral-4)' }} />
@@ -1595,7 +1618,7 @@ function DateDivider({ label }: { label: string }) {
 
 function LastReadDivider() {
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-3 px-10">
       <div className="h-px flex-1" style={{ backgroundColor: 'var(--color-primary)' }} />
       <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-primary)' }}>Last read</span>
       <div className="h-px flex-1" style={{ backgroundColor: 'var(--color-primary)' }} />
@@ -1608,15 +1631,36 @@ function MessageArea({
   onOpenThread,
   fullWidth,
   lastReadMessageId,
+  readOnly,
+  flashMessageId,
+  flashToken,
+  scrollToMessageId,
 }: {
   room: Room
   onOpenThread: (m: Message) => void
   fullWidth: boolean
   lastReadMessageId?: string | null
+  // Search-preview panel: hides reaction bars, disables thread navigation.
+  readOnly?: boolean
+  // The message to flash (indigo-6, one-time) — paired with flashToken so the
+  // same message can be re-flashed on a later jump (bump flashToken).
+  flashMessageId?: string | null
+  flashToken?: number
+  // Jump straight to this message instead of the usual scroll-to-bottom.
+  scrollToMessageId?: string | null
 }) {
   const lastMineId = [...room.messages].reverse().find((m) => m.author === 'me')?.id ?? null
   const bottomRef = useRef<HTMLDivElement>(null)
   const now = new Date()
+
+  // Jump-to-message scroll fires once per flashToken bump — independent of the
+  // bottom-scroll effect below, so a later new message still scrolls to bottom
+  // instead of snapping back to the old flashed message.
+  useEffect(() => {
+    if (scrollToMessageId && flashToken) {
+      document.getElementById(`msg-${scrollToMessageId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [flashToken, scrollToMessageId])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -1645,12 +1689,194 @@ function MessageArea({
               <Fragment key={m.id}>
                 {dateLabel && <DateDivider label={dateLabel} />}
                 {lastReadMessageId === m.id && <LastReadDivider />}
-                <MessageBubble message={m} isLastMine={m.id === lastMineId} onOpenThread={onOpenThread} room={room} />
+                <MessageBubble
+                  message={m}
+                  isLastMine={m.id === lastMineId}
+                  onOpenThread={onOpenThread}
+                  room={room}
+                  readOnly={readOnly}
+                  flashToken={m.id === flashMessageId ? flashToken : undefined}
+                />
               </Fragment>
             )
           })}
           <div ref={bottomRef} />
         </div>
+      </div>
+    </div>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Universal search modal — triggered by ChatList's header Search button.
+// No dimmed backdrop (per spec): a transparent full-screen click-catcher behind
+// a floating card. Empty query → empty state. Query → People/Chatroom/Message
+// tabs (People default), result rows referencing Microsoft Teams' search IA.
+// Clicking a Message result opens a read-only preview pane on the right that
+// reuses MessageArea (readOnly, scrolled + flashed to that message); its header
+// swaps all normal actions for a single "View message" button.
+// ════════════════════════════════════════════════════════════════════════════
+function NoSearchResults() {
+  return (
+    <p className="px-4 py-8 text-center" style={{ fontSize: 13, color: 'var(--color-neutral-7)' }}>
+      No results found
+    </p>
+  )
+}
+
+function MessagePreviewHeader({ room, onViewMessage }: { room: Room; onViewMessage: () => void }) {
+  const roomAvatar = room.type === 'dm' && room.person ? <PersonAvatar person={room.person} size={32} /> : <GroupAvatar size={32} />
+  return (
+    <header className="flex shrink-0 items-center gap-2 border-b border-divider bg-surface px-4 py-2">
+      {roomAvatar}
+      <h1 className="min-w-0 flex-1 truncate" style={{ fontSize: 16, fontWeight: 500, lineHeight: '130%' }}>{room.title}</h1>
+      <Button variant="primary" size="sm" onClick={onViewMessage}>View message</Button>
+    </header>
+  )
+}
+
+function SearchModal({
+  rooms,
+  onClose,
+  onNavigateRoom,
+  onViewMessage,
+}: {
+  rooms: Room[]
+  onClose: () => void
+  onNavigateRoom: (roomId: string) => void
+  onViewMessage: (roomId: string, messageId: string) => void
+}) {
+  const [query, setQuery] = useState('')
+  const [tab, setTab] = useState<'people' | 'chatroom' | 'message'>('people')
+  const [preview, setPreview] = useState<{ roomId: string; messageId: string; token: number } | null>(null)
+  const q = query.trim().toLowerCase()
+
+  const peopleResults = q ? rooms.filter((r) => r.type === 'dm' && r.person && r.person.name.toLowerCase().includes(q)) : []
+  const chatroomResults = q ? rooms.filter((r) => r.title.toLowerCase().includes(q)) : []
+  const messageResults = q
+    ? rooms.flatMap((r) => r.messages.filter((m) => m.text.toLowerCase().includes(q)).map((m) => ({ room: r, message: m })))
+    : []
+
+  const previewRoom = preview ? rooms.find((r) => r.id === preview.roomId) ?? null : null
+
+  return (
+    <div className="fixed inset-0 z-50" onClick={onClose}>
+      <div
+        className="absolute left-1/2 flex -translate-x-1/2 overflow-hidden rounded-2xl border border-divider bg-surface shadow-2xl"
+        style={{ top: 80, width: tab === 'message' && previewRoom ? 920 : 560, maxHeight: '70vh' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex w-[560px] shrink-0 flex-col" style={{ maxHeight: '70vh' }}>
+          <div className="flex items-center gap-2 border-b border-divider px-4 py-3">
+            <Search size={18} style={{ color: 'var(--color-neutral-7)' }} />
+            <input
+              autoFocus
+              value={query}
+              onChange={(e) => { setQuery(e.target.value); setPreview(null) }}
+              placeholder="Search people, chatroom, or message…"
+              className="flex-1 bg-transparent outline-none"
+              style={{ fontSize: 14, color: 'var(--color-foreground)' }}
+            />
+            <button type="button" aria-label="Close search" onClick={onClose} className="rounded-md p-1 hover:bg-neutral-hover">
+              <X size={16} style={{ color: 'var(--color-neutral-7)' }} />
+            </button>
+          </div>
+
+          {!q ? (
+            <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 py-16 text-center">
+              <Search size={28} style={{ color: 'var(--color-neutral-5)' }} />
+              <p style={{ fontSize: 13, color: 'var(--color-neutral-7)' }}>Search for people, chatrooms, or messages</p>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-1 border-b border-divider px-3 pt-2">
+                {(['people', 'chatroom', 'message'] as const).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setTab(t)}
+                    className="relative px-3 pb-2 capitalize"
+                    style={{ fontSize: 13, fontWeight: 500, color: tab === t ? 'var(--color-primary)' : 'var(--color-neutral-7)' }}
+                  >
+                    {t}
+                    {tab === t && <span className="absolute inset-x-0 -bottom-px h-0.5" style={{ backgroundColor: 'var(--color-primary)' }} />}
+                  </button>
+                ))}
+              </div>
+              <div className="scroll-hover min-h-0 flex-1 overflow-y-auto py-2">
+                {tab === 'people' && (peopleResults.length ? peopleResults.map((r) => (
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() => onNavigateRoom(r.id)}
+                    className="flex w-full items-center gap-3 px-4 py-2 text-left hover:bg-neutral-hover"
+                  >
+                    <PersonAvatar person={r.person!} size={32} />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate" style={{ fontSize: 14, fontWeight: 500 }}>{r.person!.name}</div>
+                      <div className="truncate" style={{ fontSize: 12, color: 'var(--color-neutral-7)' }}>{r.person!.role}</div>
+                    </div>
+                  </button>
+                )) : <NoSearchResults />)}
+
+                {tab === 'chatroom' && (chatroomResults.length ? chatroomResults.map((r) => (
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() => onNavigateRoom(r.id)}
+                    className="flex w-full items-center gap-3 px-4 py-2 text-left hover:bg-neutral-hover"
+                  >
+                    {r.type === 'dm' && r.person ? <PersonAvatar person={r.person} size={32} /> : <GroupAvatar size={32} />}
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate" style={{ fontSize: 14, fontWeight: 500 }}>{r.title}</div>
+                      <div className="truncate" style={{ fontSize: 12, color: 'var(--color-neutral-7)' }}>
+                        {r.type === 'dm' ? 'Direct message' : `${r.memberKeys?.length ?? 0} members`}
+                      </div>
+                    </div>
+                  </button>
+                )) : <NoSearchResults />)}
+
+                {tab === 'message' && (messageResults.length ? messageResults.map(({ room, message }) => {
+                  const author = message.author === 'me' ? ME : PEOPLE[message.author]
+                  return (
+                    <button
+                      key={message.id}
+                      type="button"
+                      onClick={() => setPreview({ roomId: room.id, messageId: message.id, token: Date.now() })}
+                      className="flex w-full items-start gap-3 px-4 py-2 text-left hover:bg-neutral-hover"
+                      style={preview?.messageId === message.id ? { backgroundColor: 'var(--color-neutral-3)' } : undefined}
+                    >
+                      {author ? <PersonAvatar person={author} size={32} /> : <GroupAvatar size={32} />}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="truncate" style={{ fontSize: 13, fontWeight: 500 }}>{author?.name ?? message.author}</span>
+                          <span className="truncate" style={{ fontSize: 12, color: 'var(--color-neutral-7)' }}>in {room.title}</span>
+                        </div>
+                        <p className="truncate" style={{ fontSize: 13, color: 'var(--color-neutral-8)' }}>{message.text}</p>
+                      </div>
+                      <span className="shrink-0" style={{ fontSize: 11, color: 'var(--color-neutral-6)' }}>{message.time}</span>
+                    </button>
+                  )
+                }) : <NoSearchResults />)}
+              </div>
+            </>
+          )}
+        </div>
+
+        {tab === 'message' && previewRoom && preview && (
+          <div className="flex min-w-0 flex-1 flex-col border-l border-divider">
+            <MessagePreviewHeader room={previewRoom} onViewMessage={() => onViewMessage(preview.roomId, preview.messageId)} />
+            <MessageArea
+              room={previewRoom}
+              onOpenThread={() => {}}
+              fullWidth={false}
+              readOnly
+              flashMessageId={preview.messageId}
+              flashToken={preview.token}
+              scrollToMessageId={preview.messageId}
+            />
+          </div>
+        )}
       </div>
     </div>
   )
@@ -1937,6 +2163,8 @@ function Conversation({
   onAction,
   groupAvatarMode = 'icon',
   lastReadMessageId,
+  flashMessageId,
+  flashToken,
 }: {
   room: Room
   listOpen: boolean
@@ -1950,6 +2178,9 @@ function Conversation({
   onAction?: (a: ChatAction) => void
   groupAvatarMode?: 'icon' | 'initial'
   lastReadMessageId?: string | null
+  // Jump-from-search: scrolls to + one-time-flashes (indigo-6) this message.
+  flashMessageId?: string | null
+  flashToken?: number
 }) {
   // Track the thread root by id (not a snapshot) so the panel re-reads live
   // room state and shows newly sent replies immediately.
@@ -1982,7 +2213,15 @@ function Conversation({
             onToggleFullWidth={onToggleFullWidth}
             groupAvatarMode={groupAvatarMode}
           />
-          <MessageArea room={room} onOpenThread={openThread} fullWidth={fullWidth} lastReadMessageId={lastReadMessageId} />
+          <MessageArea
+            room={room}
+            onOpenThread={openThread}
+            fullWidth={fullWidth}
+            lastReadMessageId={lastReadMessageId}
+            flashMessageId={flashMessageId}
+            flashToken={flashToken}
+            scrollToMessageId={flashMessageId}
+          />
           <InputBox key={room.id} fullWidth={fullWidth} onSend={onSend} />
         </div>
       )}
@@ -2068,6 +2307,10 @@ export default function App({
   // moment an unread room is opened, and is cleared the instant the user
   // navigates away — returning to the room later shows no divider.
   const [lastReadDivider, setLastReadDivider] = useState<{ roomId: string; messageId: string } | null>(null)
+  const [searchOpen, setSearchOpen] = useState(false)
+  // Jump-to-message from the universal search modal's "View message" button —
+  // bumping token re-triggers the one-time indigo-6 flash on the same message.
+  const [flash, setFlash] = useState<{ roomId: string; messageId: string; token: number } | null>(null)
 
   const current = rooms.find((r) => r.id === activeId) ?? rooms[0]
   const unreadCount = rooms.filter((r) => r.unread && !mutedIds.has(r.id)).length
@@ -2098,6 +2341,20 @@ export default function App({
       setLastReadDivider(null)
     }
     setActiveId(id)
+  }
+
+  // People/Chatroom search tabs — jump straight to the room, no preview/flash.
+  function handleSearchNavigateRoom(roomId: string) {
+    if (roomId !== activeId) handleSelectRoom(roomId)
+    setSearchOpen(false)
+  }
+
+  // Message tab's "View message" — closes the modal, opens the room (if needed),
+  // and flashes the target bubble in the real conversation view.
+  function handleSearchViewMessage(roomId: string, messageId: string) {
+    if (roomId !== activeId) handleSelectRoom(roomId)
+    setFlash({ roomId, messageId, token: Date.now() })
+    setSearchOpen(false)
   }
 
   function handleToggleFavorite(id: string) {
@@ -2153,6 +2410,7 @@ export default function App({
             onToggleMute={handleToggleMute}
             onToggleFavorite={handleToggleFavorite}
             groupAvatarMode={groupAvatarMode}
+            onSearch={() => setSearchOpen(true)}
           />
         )}
         <Conversation
@@ -2168,6 +2426,8 @@ export default function App({
           onAction={onAction}
           groupAvatarMode={groupAvatarMode}
           lastReadMessageId={lastReadDivider?.roomId === current.id ? lastReadDivider.messageId : null}
+          flashMessageId={flash?.roomId === current.id ? flash.messageId : null}
+          flashToken={flash?.roomId === current.id ? flash.token : undefined}
         />
       </div>
       <SettingsModal
@@ -2176,6 +2436,14 @@ export default function App({
         showPreview={showPreview}
         onConfirm={(v) => { setShowPreview(v); onAction?.({ type: 'toggle-preview', value: v }) }}
       />
+      {searchOpen && (
+        <SearchModal
+          rooms={rooms}
+          onClose={() => setSearchOpen(false)}
+          onNavigateRoom={handleSearchNavigateRoom}
+          onViewMessage={handleSearchViewMessage}
+        />
+      )}
     </TooltipProvider>
   )
 }
