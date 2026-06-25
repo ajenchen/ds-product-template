@@ -57,7 +57,7 @@ const project: UTProject<MyAction> = {
 ```tsx
 import { UsabilityTest, UsabilityTestAB } from '@imethan0254/ut-model-a'
 
-<UsabilityTestAB project={project} order={['A', 'B']} password="0000" /> // A→B 綜合
+<UsabilityTestAB project={project} order={['A', 'B']} /> // A→B 綜合
 <UsabilityTest project={project} variant="A" />                          // 只測單版
 ```
 
@@ -69,7 +69,7 @@ import { UsabilityTest, UsabilityTestAB } from '@imethan0254/ut-model-a'
 | `UsabilityTestAB({ project, order?, password? })` | A→B 雙版本綜合流程(預設 `order=['A','B']`) |
 | `UTProject<A>` / `UTask<A>` / `UTVariant<A>` | 對外型別,`A` = 你的操作事件 union |
 
-`password` 是測試頁自己的密碼閘門(預設 `0000`),與 Netlify Basic Password 無關。
+`password` 是**選用**的元件層密碼閘門(不傳 = 不擋)。在 Storybook 中**不要**用它(會出現在 Controls 而外洩);請改在 `.storybook/preview.tsx` 用 preview decorator 綁一個 Storybook 維度的密碼(預設 `0000`)—— 這樣鎖在 Storybook 層、不會出現在 story Controls。真正要鎖死(防繞過)請用 Netlify Basic Password(edge 層)。
 
 ## 摘要頁自動交付(Excel + 螢幕錄製)
 

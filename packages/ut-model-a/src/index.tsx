@@ -1412,9 +1412,9 @@ function CombinedResultScreen({ project, runs, tester, postTestAnswers, recordin
 }
 
 // ── 對外:單版本流程 ────────────────────────────────────────────────────────
-export function UsabilityTest<A>({ project, variant, password = '0000', record = false, defaultLang = 'zh', estimatedMinutes = 15 }: { project: UTProject<A>; variant: string; password?: string; record?: boolean; defaultLang?: Lang; estimatedMinutes?: number }) {
+export function UsabilityTest<A>({ project, variant, password, record = false, defaultLang = 'zh', estimatedMinutes = 15 }: { project: UTProject<A>; variant: string; password?: string; record?: boolean; defaultLang?: Lang; estimatedMinutes?: number }) {
   const [lang, setLang] = useState<Lang>(defaultLang)
-  const [unlocked, setUnlocked] = useState(false)
+  const [unlocked, setUnlocked] = useState(!password)
   const [phase, setPhase] = useState<'intro' | 'running' | 'posttest' | 'done'>('intro')
   const [tester, setTester] = useState('')
   const [run, setRun] = useState<VariantRun | null>(null)
@@ -1428,7 +1428,7 @@ export function UsabilityTest<A>({ project, variant, password = '0000', record =
 
   let content: ReactNode
   if (!unlocked) {
-    content = <PasswordGate password={password} lang={lang} onUnlock={() => setUnlocked(true)} />
+    content = <PasswordGate password={password ?? ""} lang={lang} onUnlock={() => setUnlocked(true)} />
   } else if (phase === 'intro') {
     content = (
       <IntroScreen
@@ -1455,9 +1455,9 @@ export function UsabilityTest<A>({ project, variant, password = '0000', record =
 }
 
 // ── 對外:多版本綜合流程(A→B→C…)──────────────────────────────────────────
-export function UsabilityTestAB<A>({ project, order = ['A', 'B'], password = '0000', record = false, defaultLang = 'zh', estimatedMinutes = 15 }: { project: UTProject<A>; order?: string[]; password?: string; record?: boolean; defaultLang?: Lang; estimatedMinutes?: number }) {
+export function UsabilityTestAB<A>({ project, order = ['A', 'B'], password, record = false, defaultLang = 'zh', estimatedMinutes = 15 }: { project: UTProject<A>; order?: string[]; password?: string; record?: boolean; defaultLang?: Lang; estimatedMinutes?: number }) {
   const [lang, setLang] = useState<Lang>(defaultLang)
-  const [unlocked, setUnlocked] = useState(false)
+  const [unlocked, setUnlocked] = useState(!password)
   const [phase, setPhase] = useState<'intro' | 'run' | 'interstitial' | 'posttest' | 'done'>('intro')
   const [tester, setTester] = useState('')
   const [vIndex, setVIndex] = useState(0)
@@ -1475,7 +1475,7 @@ export function UsabilityTestAB<A>({ project, order = ['A', 'B'], password = '00
 
   let content: ReactNode
   if (!unlocked) {
-    content = <PasswordGate password={password} lang={lang} onUnlock={() => setUnlocked(true)} />
+    content = <PasswordGate password={password ?? ""} lang={lang} onUnlock={() => setUnlocked(true)} />
   } else if (phase === 'intro') {
     content = (
       <IntroScreen
