@@ -128,6 +128,12 @@ Conversation
     └── ThreadInputBox        含 "Also send to chatroom" checkbox；圓角 rounded-lg(8px)；Send 按鈕 24×24 + 無值 text / 有值 primary（與主 InputBox 同規則）（ThreadPanel 容器無 `border-l`，視覺分隔線由 ResizeHandle 1px line 提供）；**可發送**（Enter 或 Send 鈕，`onSend(text, alsoSend)` 上拋至 App `handleThreadSend`）
 ```
 
+> **未讀標記 + Last read / 日期分隔線（2026-06-25 confirmed）**：
+> - **點擊未讀 RoomRow 轉已讀**：`App.handleSelectRoom` 點擊非當前 room 時，若該 room `unread===true`，在 `setRooms` 標記 `unread:false` 之前，先把它最後一則訊息的 id 存進 `lastReadDivider = { roomId, messageId }`；點擊已讀 room 則清空 `lastReadDivider`。換 room 即清掉上個 room 的標記，所以**離開後再回來不會再看到這條線**（state 只認「這次切換」，不持久化）。
+> - **Last read divider**：`MessageArea` 收 `lastReadMessageId` prop（= `lastReadDivider` 命中當前 room 時的 messageId），渲染時若該訊息 id 命中就在泡泡上方插入 `LastReadDivider`（純色線 `var(--color-primary)` + 置中文字 "Last read" 12px/500 同色）。
+> - **日期分隔線**：`Message.date?: string`（ISO `YYYY-MM-DD`，省略 = 預設今天，因多數 demo 訊息只有 `time: 'HH:MM'`）。`MessageArea` 逐則算 `getMsgDate(m, now).toDateString()`，與前一則不同就插入 `DateDivider`（neutral-4 線 + 置中文字 neutral-7 12px/400）。文字格式 `formatDateDivider`：今天 `Today, W{ISO週數}`；昨天 `Yesterday, W##`；本週其他天 `{星期英文}, W##`；今年本週以前 `M/D, W##`；非今年 `M/D, YYYY, W##`。週數用標準 ISO-8601 算法（`getISOWeek`）。
+> - Demo 資料：`shinichi`（預設/未讀 room）m1 = 3 天前（本週一）、m2/m3 = 昨天、m4–m7 = 今天（省略 `date`），同時展示三種桶 + Last read 線（落在最後一則 m7 上方）。`ai`/`ran` room 的 `5/28`/`5/25` 訊息補 `date: '2026-05-28'/'2026-05-25'`（今年本週以前桶）；`engineering` room `e1` 改 `date: '2025-05-26'`（跨年桶）。Thread panel 內訊息不顯示日期分隔線（僅 main MessageArea）。
+
 > **IME 中文輸入法 Enter 防誤送出（2026-06-24 fix）**：主 InputBox（單行/多行兩處）+ ThreadInputBox 的 Enter-to-send `onKeyDown` 一律加 `!e.nativeEvent.isComposing && e.keyCode !== 229` 防呆 — 中文/日文等輸入法用 Enter 確認候選字時不應觸發 send，只有「選字完成後再按一次 Enter」（此時非 composing）才送出。`keyCode !== 229` 額外擋 Safari 在 composing Enter 上 `isComposing` 回報不準的已知瑕疵。
 
 > **Thread 發送 + "replied to a thread" link（2026-06-19 confirmed）**：
@@ -171,7 +177,7 @@ type MsgStatus = 'sending' | 'sent' | 'read'
 
 type Person  = { name; color; status: Presence; role; email; avatar }
 type Reaction = { emoji; count }
-type Message = { id; author; text; time; status: MsgStatus; reactions[]; replies; threadMessages[]; images?: string[] }
+type Message = { id; author; text; time; status: MsgStatus; reactions[]; replies; threadMessages[]; images?: string[]; date?: string }
 type Room    = { id; name; type; section: 'favorites' | 'chats'; unread; messages[] }
 ```
 

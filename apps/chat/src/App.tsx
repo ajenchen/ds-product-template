@@ -1,7 +1,7 @@
 // Chat prototype — 3-column messaging UI(Nav rail / Chat list / Conversation + Thread panel)
 // v3.1: tooltip fix / overflow fix / header mute / status outside bubble / reaction menus / thread panel cleanup
 
-import { useEffect, useId, useRef, useState } from 'react'
+import { Fragment, useEffect, useId, useRef, useState } from 'react'
 import {
   TooltipProvider,
   Tooltip,
@@ -184,6 +184,9 @@ type Message = {
   // Set on a main-area copy of a thread reply (when "Also send to chatroom" is on).
   // Points at the thread's root message; drives the "replied to a thread" link.
   repliedToThreadParentId?: string
+  // ISO 'YYYY-MM-DD' send date, used to group bubbles under a date divider.
+  // Omitted = defaults to "today" (most demo messages only carry a HH:MM time).
+  date?: string
 }
 
 type Room = {
@@ -321,7 +324,7 @@ const INITIAL_ROOMS: Room[] = [
     unread: true,
     person: PEOPLE.shinichi,
     messages: [
-      { id: 'm1', author: 'shinichi', text: 'Morning! Is the oolong tasting flight ready?', time: '09:12', reactions: [{ emoji: '👍', count: 8 }], threadMessages: [
+      { id: 'm1', author: 'shinichi', text: 'Morning! Is the oolong tasting flight ready?', time: '09:12', date: '2026-06-22', reactions: [{ emoji: '👍', count: 8 }], threadMessages: [
         { id: 'm1-t1', author: 'me', text: "I'll confirm with the sourcing team first.", time: '09:13' },
         { id: 'm1-t2', author: 'shinichi', text: 'The Dong Ding batch or the High Mountain?', time: '09:13' },
         { id: 'm1-t3', author: 'me', text: 'Both — 4 samples each.', time: '09:13' },
@@ -331,8 +334,8 @@ const INITIAL_ROOMS: Room[] = [
         { id: 'm1-t7', author: 'shinichi', text: 'Perfect. See everyone at 10:30.', time: '09:15' },
         { id: 'm1-t8', author: 'me', text: '👍 See you there.', time: '09:15' },
       ] },
-      { id: 'm2', author: 'me', text: 'All set — 10:30 in tasting room No.3.', time: '09:14', msgStatus: 'sent' },
-      { id: 'm3', author: 'shinichi', text: 'Great, I will prepare the scoring sheet.', time: '09:15' },
+      { id: 'm2', author: 'me', text: 'All set — 10:30 in tasting room No.3.', time: '09:14', date: '2026-06-24', msgStatus: 'sent' },
+      { id: 'm3', author: 'shinichi', text: 'Great, I will prepare the scoring sheet.', time: '09:15', date: '2026-06-24' },
       {
         id: 'm4', author: 'shinichi', time: '09:18',
         text: "Just finished reviewing the Dong Ding samples from the Lugu Co-op. The spring harvest this year is noticeably lighter in body than last year — likely due to the unusually dry March. The roast on batch #3 is particularly interesting though; it has this subtle honey-caramel finish that lingers for almost a minute. I think it could be a strong candidate for the premium single-origin line. Can you pull the moisture readings and compare against the Q1 benchmark?",
@@ -394,11 +397,11 @@ const INITIAL_ROOMS: Room[] = [
     unread: true,
     person: PEOPLE.ai,
     messages: [
-      { id: 'a1', author: 'ai', text: 'The new supplier samples arrived.', time: '5/28', threadMessages: [
+      { id: 'a1', author: 'ai', text: 'The new supplier samples arrived.', time: '5/28', date: '2026-05-28', threadMessages: [
         { id: 'a1-t1', author: 'ai', text: 'Three oolong, two green tea varieties.', time: '5/28' },
         { id: 'a1-t2', author: 'me', text: 'I will set up the cupping station.', time: '5/28' },
       ] },
-      { id: 'a2', author: 'me', text: 'Perfect, let us cup them tomorrow.', time: '5/28', msgStatus: 'read' },
+      { id: 'a2', author: 'me', text: 'Perfect, let us cup them tomorrow.', time: '5/28', date: '2026-05-28', msgStatus: 'read' },
     ],
   },
   {
@@ -408,7 +411,7 @@ const INITIAL_ROOMS: Room[] = [
     section: 'chats',
     unread: false,
     person: PEOPLE.ran,
-    messages: [{ id: 'r1', author: 'ran', text: 'Thanks! Have a great weekend 🍵', time: '5/25' }],
+    messages: [{ id: 'r1', author: 'ran', text: 'Thanks! Have a great weekend 🍵', time: '5/25', date: '2026-05-25' }],
   },
   {
     id: 'product-team',
@@ -497,7 +500,7 @@ const INITIAL_ROOMS: Room[] = [
     section: 'chats',
     unread: false,
     memberKeys: ['kenji', 'yui'],
-    messages: [{ id: 'e1', author: 'kenji', text: 'PR merged. Closing the ticket.', time: '5/26' }],
+    messages: [{ id: 'e1', author: 'kenji', text: 'PR merged. Closing the ticket.', time: '5/26', date: '2025-05-26' }],
   },
   ...GENERATED_CHAT_ROOMS,
 ]
@@ -1540,13 +1543,86 @@ function MessageBubble({
   )
 }
 
-function MessageArea({ room, onOpenThread, fullWidth }: { room: Room; onOpenThread: (m: Message) => void; fullWidth: boolean }) {
+// ── Date divider helpers ────────────────────────────────────────────────────
+// Message.date defaults to "today" when absent (most demo messages only carry
+// a HH:MM time, implying same-day conversation).
+function startOfDay(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate())
+}
+
+function getMsgDate(m: Message, now: Date): Date {
+  if (!m.date) return startOfDay(now)
+  const [y, mo, d] = m.date.split('-').map(Number)
+  return new Date(y, mo - 1, d)
+}
+
+// ISO-8601 week number (1–53).
+function getISOWeek(date: Date): number {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+  const dayNum = d.getUTCDay() || 7
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum)
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
+  return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7)
+}
+
+const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+
+// Today → "Today, W26" · Yesterday → "Yesterday, W26" · this week (other day)
+// → "Monday, W26" · this year (earlier) → "5/25, W22" · earlier year → "5/25, 2025, W22".
+function formatDateDivider(target: Date, now: Date): string {
+  const t = startOfDay(target)
+  const n = startOfDay(now)
+  const diffDays = Math.round((n.getTime() - t.getTime()) / 86400000)
+  const week = getISOWeek(target)
+  if (diffDays === 0) return `Today, W${week}`
+  if (diffDays === 1) return `Yesterday, W${week}`
+  const sameWeek = diffDays > 0 && diffDays < 7 && getISOWeek(now) === week && now.getFullYear() === target.getFullYear()
+  if (sameWeek) return `${WEEKDAY_NAMES[target.getDay()]}, W${week}`
+  const md = `${target.getMonth() + 1}/${target.getDate()}`
+  if (target.getFullYear() === now.getFullYear()) return `${md}, W${week}`
+  return `${md}, ${target.getFullYear()}, W${week}`
+}
+
+function DateDivider({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-3">
+      <div className="h-px flex-1" style={{ backgroundColor: 'var(--color-neutral-4)' }} />
+      <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--color-neutral-7)' }}>{label}</span>
+      <div className="h-px flex-1" style={{ backgroundColor: 'var(--color-neutral-4)' }} />
+    </div>
+  )
+}
+
+function LastReadDivider() {
+  return (
+    <div className="flex items-center gap-3">
+      <div className="h-px flex-1" style={{ backgroundColor: 'var(--color-primary)' }} />
+      <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-primary)' }}>Last read</span>
+      <div className="h-px flex-1" style={{ backgroundColor: 'var(--color-primary)' }} />
+    </div>
+  )
+}
+
+function MessageArea({
+  room,
+  onOpenThread,
+  fullWidth,
+  lastReadMessageId,
+}: {
+  room: Room
+  onOpenThread: (m: Message) => void
+  fullWidth: boolean
+  lastReadMessageId?: string | null
+}) {
   const lastMineId = [...room.messages].reverse().find((m) => m.author === 'me')?.id ?? null
   const bottomRef = useRef<HTMLDivElement>(null)
+  const now = new Date()
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [room.messages.length])
+
+  let prevDateKey: string | null = null
 
   // Plain overflow div (not DS ScrollArea): Radix Viewport wraps children in a
   // `display:table; min-width:100%` box that grows to a wide table's max-content,
@@ -1560,9 +1636,19 @@ function MessageArea({ room, onOpenThread, fullWidth }: { room: Room; onOpenThre
           className="mx-auto flex flex-col gap-3 min-w-0"
           style={fullWidth ? undefined : { maxWidth: 960 }}
         >
-          {room.messages.map((m) => (
-            <MessageBubble key={m.id} message={m} isLastMine={m.id === lastMineId} onOpenThread={onOpenThread} room={room} />
-          ))}
+          {room.messages.map((m) => {
+            const dateKey = getMsgDate(m, now).toDateString()
+            const showDateDivider = dateKey !== prevDateKey
+            const dateLabel = showDateDivider ? formatDateDivider(getMsgDate(m, now), now) : null
+            prevDateKey = dateKey
+            return (
+              <Fragment key={m.id}>
+                {dateLabel && <DateDivider label={dateLabel} />}
+                {lastReadMessageId === m.id && <LastReadDivider />}
+                <MessageBubble message={m} isLastMine={m.id === lastMineId} onOpenThread={onOpenThread} room={room} />
+              </Fragment>
+            )
+          })}
           <div ref={bottomRef} />
         </div>
       </div>
@@ -1850,6 +1936,7 @@ function Conversation({
   onThreadSend,
   onAction,
   groupAvatarMode = 'icon',
+  lastReadMessageId,
 }: {
   room: Room
   listOpen: boolean
@@ -1862,6 +1949,7 @@ function Conversation({
   onThreadSend: (parentId: string, text: string, alsoSend: boolean) => void
   onAction?: (a: ChatAction) => void
   groupAvatarMode?: 'icon' | 'initial'
+  lastReadMessageId?: string | null
 }) {
   // Track the thread root by id (not a snapshot) so the panel re-reads live
   // room state and shows newly sent replies immediately.
@@ -1894,7 +1982,7 @@ function Conversation({
             onToggleFullWidth={onToggleFullWidth}
             groupAvatarMode={groupAvatarMode}
           />
-          <MessageArea room={room} onOpenThread={openThread} fullWidth={fullWidth} />
+          <MessageArea room={room} onOpenThread={openThread} fullWidth={fullWidth} lastReadMessageId={lastReadMessageId} />
           <InputBox key={room.id} fullWidth={fullWidth} onSend={onSend} />
         </div>
       )}
@@ -1955,6 +2043,10 @@ export default function App({
   const [favOrder, setFavOrder] = useState<string[]>(
     INITIAL_ROOMS.filter((r) => r.section === 'favorites').map((r) => r.id)
   )
+  // The "Last read" divider only shows for the room/message captured at the
+  // moment an unread room is opened, and is cleared the instant the user
+  // navigates away — returning to the room later shows no divider.
+  const [lastReadDivider, setLastReadDivider] = useState<{ roomId: string; messageId: string } | null>(null)
 
   const current = rooms.find((r) => r.id === activeId) ?? rooms[0]
   const unreadCount = rooms.filter((r) => r.unread && !mutedIds.has(r.id)).length
@@ -1974,9 +2066,17 @@ export default function App({
   }
 
   function handleSelectRoom(id: string) {
-    setActiveId(id)
+    if (id === activeId) return
     const r = rooms.find((x) => x.id === id)
     if (r) onAction?.({ type: 'open-room', roomId: r.id, roomTitle: r.title, unread: !!r.unread })
+    if (r?.unread) {
+      const lastMsg = r.messages[r.messages.length - 1]
+      setLastReadDivider(lastMsg ? { roomId: id, messageId: lastMsg.id } : null)
+      setRooms((prev) => prev.map((x) => (x.id === id ? { ...x, unread: false } : x)))
+    } else {
+      setLastReadDivider(null)
+    }
+    setActiveId(id)
   }
 
   function handleToggleFavorite(id: string) {
@@ -2046,6 +2146,7 @@ export default function App({
           onThreadSend={handleThreadSend}
           onAction={onAction}
           groupAvatarMode={groupAvatarMode}
+          lastReadMessageId={lastReadDivider?.roomId === current.id ? lastReadDivider.messageId : null}
         />
       </div>
       <SettingsModal
