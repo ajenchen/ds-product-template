@@ -118,6 +118,7 @@ const meta: Meta<typeof UsabilityTest> = {
   title: 'UT/Chat List Preview Message Display Preferences',
   component: UsabilityTest,
   parameters: { layout: 'fullscreen' },
+  argTypes: { password: { table: { disable: true } } },
 }
 export default meta
 type Story = StoryObj<typeof UsabilityTest>
