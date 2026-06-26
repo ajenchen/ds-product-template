@@ -36,18 +36,23 @@ const chatListPreviewProject: UTProject<ChatAction> = {
   ],
   postTaskSurvey: [seqQuestion, postTaskComment],
   postTestSurvey: [
-    { id: 'like', questionType: 'writtenResponse', prompt: { zh: '這次體驗中你最喜歡的部分是什麼?', en: 'What did you like most about this experience?' }, minChars: 15 },
-    { id: 'change', questionType: 'writtenResponse', prompt: { zh: '如果可以改一件事,你會改什麼?', en: 'If you could change one thing, what would it be?' }, minChars: 15 },
+    { id: 'like', questionType: 'writtenResponse', prompt: { zh: '這次體驗中你最喜歡的部分是什麼?', en: 'What did you like most about this experience?' }, required: false },
+    { id: 'change', questionType: 'writtenResponse', prompt: { zh: '如果可以改一件事,你會改什麼?', en: 'If you could change one thing, what would it be?' }, required: false },
     { id: 'unexpected', questionType: 'writtenResponse', prompt: { zh: '過程中有沒有遇到任何意外或預期外的狀況?', en: 'Did anything unexpected happen during the process?' }, required: false },
   ],
   tasks: [
     {
       id: 't1',
-      title: { zh: '找到並開啟「IT Sales - Table格式範例」這個聊天室。', en: "Find and open the 'IT Sales - Table format example' chat." },
+      title: { zh: '用聊天列表上方的「搜尋」,找到並開啟「IT Sales - Table格式範例」這個聊天室。', en: "Use the search at the top of the chat list to find and open the 'IT Sales - Table format example' chat." },
       check: (acts) =>
         acts.some((a) => a.type === 'open-room' && a.roomId === 'semi-sales')
           ? { ok: true }
           : { ok: false, reason: { zh: '未開啟「IT Sales - Table格式範例」聊天室', en: "Did not open the 'IT Sales - Table format example' chat" } },
+      postTask: [
+        seqQuestion,
+        { id: 'search-exp', questionType: 'writtenResponse', prompt: { zh: '這個搜尋好不好用?有沒有找到你要的?為什麼?', en: 'Was the search easy to use? Did it find what you wanted? Why?' }, required: false },
+        { id: 'search-want', questionType: 'writtenResponse', prompt: { zh: '你會希望搜尋還能搜到什麼?(例如:訊息內容、人名、檔案)', en: 'What else would you want search to find? (e.g., message content, people, files)' }, required: false },
+      ],
     },
     {
       id: 't2',
@@ -60,19 +65,6 @@ const chatListPreviewProject: UTProject<ChatAction> = {
       postTask: [
         seqQuestion,
         { id: 't2-open', questionType: 'writtenResponse', prompt: { zh: '你是怎麼判斷哪些聊天室有未讀訊息的?', en: 'How did you tell which chats had unread messages?' }, required: false },
-      ],
-    },
-    {
-      id: 't-search',
-      title: { zh: '用聊天列表上方的「搜尋」,找到並開啟名稱含「Sales」的聊天室。', en: 'Use the search at the top of the chat list to find and open a chat whose name contains "Sales".' },
-      check: (acts) =>
-        acts.some((a) => a.type === 'open-room' && a.roomTitle.includes('Sales'))
-          ? { ok: true }
-          : { ok: false, reason: { zh: '未開啟名稱含「Sales」的聊天室', en: 'Did not open a chat whose name contains "Sales"' } },
-      postTask: [
-        seqQuestion,
-        { id: 'search-exp', questionType: 'writtenResponse', prompt: { zh: '這個搜尋好不好用?有沒有找到你要的?為什麼?', en: 'Was the search easy to use? Did it find what you wanted? Why?' }, minChars: 10 },
-        { id: 'search-want', questionType: 'writtenResponse', prompt: { zh: '你會希望搜尋還能搜到什麼?(例如:訊息內容、人名、檔案)', en: 'What else would you want search to find? (e.g., message content, people, files)' }, required: false },
       ],
     },
     {
@@ -114,7 +106,7 @@ const chatListPreviewProject: UTProject<ChatAction> = {
             zh: '你比較喜歡「有顯示」還是「不顯示」最新訊息預覽?為什麼?(顯示與否對你使用上的差別)',
             en: 'Do you prefer SHOWING or HIDING the latest-message preview? Why? (how it affects your use)',
           },
-          minChars: 10,
+          required: false,
         },
         postTaskComment,
       ],
