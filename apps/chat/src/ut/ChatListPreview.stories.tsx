@@ -38,8 +38,6 @@ const chatListPreviewProject: UTProject<ChatAction> = {
   postTestSurvey: [
     // 預覽偏好改在最後問一次(體驗完三版後回答更準),不再每版重複。
     { id: 'preview-pref', questionType: 'writtenResponse', prompt: { zh: '你比較喜歡聊天列表「有顯示」還是「不顯示」最新訊息預覽?為什麼?(顯示與否對你使用上的差別)', en: 'Do you prefer the chat list SHOWING or HIDING the latest-message preview? Why? (how it affects your use)' }, required: false },
-    { id: 'like', questionType: 'writtenResponse', prompt: { zh: '這次體驗中你最喜歡的部分是什麼?', en: 'What did you like most about this experience?' }, required: false },
-    { id: 'change', questionType: 'writtenResponse', prompt: { zh: '如果可以改一件事,你會改什麼?', en: 'If you could change one thing, what would it be?' }, required: false },
     { id: 'unexpected', questionType: 'writtenResponse', prompt: { zh: '過程中有沒有遇到任何意外或預期外的狀況?', en: 'Did anything unexpected happen during the process?' }, required: false },
   ],
   tasks: [
