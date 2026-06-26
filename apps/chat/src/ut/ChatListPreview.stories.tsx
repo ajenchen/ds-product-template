@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react'
 import { UsabilityTest, UsabilityTestAB, type UTProject } from '@imethan0254/ut-model-a'
 import { chatVariant, type ChatAction } from './chatAdapter'
+import { utSubmit } from './utSubmit'
 
 // ── UT 專案定義:Chat List Preview Message Display Preferences ────────────────
 // 雙語(zh/en):所有 title / goal / instructions / tasks / variants / survey 皆以
@@ -108,27 +109,27 @@ type Story = StoryObj<typeof UsabilityTest>
 // record:錄製畫面+講話聲,摘要頁自動下載 webm + Excel。預設中文,測試說明頁可切 English。
 export const CombinedAB: Story = {
   name: '綜合測試 A→B→C(含結論)',
-  render: () => <UsabilityTestAB project={chatListPreviewProject} order={['A', 'B', 'C']} record />,
+  render: () => <UsabilityTestAB project={chatListPreviewProject} order={['A', 'B', 'C']} record submit={utSubmit} />,
 }
 export const CombinedBCA: Story = {
   name: '綜合測試 B→C→A(counterbalance)',
-  render: () => <UsabilityTestAB project={chatListPreviewProject} order={['B', 'C', 'A']} record />,
+  render: () => <UsabilityTestAB project={chatListPreviewProject} order={['B', 'C', 'A']} record submit={utSubmit} />,
 }
 export const CombinedCAB: Story = {
   name: '綜合測試 C→A→B(counterbalance)',
-  render: () => <UsabilityTestAB project={chatListPreviewProject} order={['C', 'A', 'B']} record />,
+  render: () => <UsabilityTestAB project={chatListPreviewProject} order={['C', 'A', 'B']} record submit={utSubmit} />,
 }
 
 // 單獨跑某一版(需要時用)。
 export const VersionA: Story = {
   name: '只測版本 A — 顯示訊息預覽',
-  render: () => <UsabilityTest project={chatListPreviewProject} variant="A" />,
+  render: () => <UsabilityTest project={chatListPreviewProject} variant="A" submit={utSubmit} />,
 }
 export const VersionB: Story = {
   name: '只測版本 B — 精簡列表',
-  render: () => <UsabilityTest project={chatListPreviewProject} variant="B" />,
+  render: () => <UsabilityTest project={chatListPreviewProject} variant="B" submit={utSubmit} />,
 }
 export const VersionC: Story = {
   name: '只測版本 C — 精簡列表 + 字母頭像',
-  render: () => <UsabilityTest project={chatListPreviewProject} variant="C" />,
+  render: () => <UsabilityTest project={chatListPreviewProject} variant="C" submit={utSubmit} />,
 }

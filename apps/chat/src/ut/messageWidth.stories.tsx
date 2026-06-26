@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react'
 import { UsabilityTest, UsabilityTestAB, type UTProject } from '@imethan0254/ut-model-a'
 import { messageWidthVariant, type ChatAction } from './messageWidthAdapter'
+import { utSubmit } from './utSubmit'
 
 // ── UT 專案定義:訊息區寬度（全寬 vs 880px 置中）──────────────────────────────
 // 雙語(zh/en):受測者可在測試說明頁切語言。A = 全寬 / B = 880px 置中欄。
@@ -88,19 +89,19 @@ type Story = StoryObj<typeof UsabilityTest>
 // record:錄製畫面+講話聲,摘要頁自動下載 webm + Excel。預設中文,測試說明頁可切 English。
 export const CombinedAB: Story = {
   name: '綜合測試 A→B（含結論）',
-  render: () => <UsabilityTestAB project={messageWidthProject} order={['A', 'B']} record />,
+  render: () => <UsabilityTestAB project={messageWidthProject} order={['A', 'B']} record submit={utSubmit} />,
 }
 export const CombinedBA: Story = {
   name: '綜合測試 B→A（counterbalance）',
-  render: () => <UsabilityTestAB project={messageWidthProject} order={['B', 'A']} record />,
+  render: () => <UsabilityTestAB project={messageWidthProject} order={['B', 'A']} record submit={utSubmit} />,
 }
 
 // 單獨跑某一版（需要時用）。
 export const VersionA: Story = {
   name: '只測版本 A — 訊息區全寬',
-  render: () => <UsabilityTest project={messageWidthProject} variant="A" />,
+  render: () => <UsabilityTest project={messageWidthProject} variant="A" submit={utSubmit} />,
 }
 export const VersionB: Story = {
   name: '只測版本 B — 880px 置中欄',
-  render: () => <UsabilityTest project={messageWidthProject} variant="B" />,
+  render: () => <UsabilityTest project={messageWidthProject} variant="B" submit={utSubmit} />,
 }

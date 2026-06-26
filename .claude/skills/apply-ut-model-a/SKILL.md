@@ -137,6 +137,7 @@ postTestSurvey: [
 - **各版本打散排序**:每個 variant 的 config 給不同的 `roomOrderSeed`(或對應你 prototype 的排序 seed),讓清單順序各版不同,避免受測者背順序。check 依 id 不依順序,所以不影響判定。
 - **預計時間**:`UsabilityTest` / `UsabilityTestAB` 可傳 `estimatedMinutes`(預設 15),測試說明頁會顯示「預計作答時間約 N 分鐘」。
 - **結果頁動作列**:匯出 Excel / 複製文字 / 重新測試 + 交回提醒已固定在結果頁底部(引擎內建),不需自己加。
+- **自動上傳集中(選用)**:傳 `submit={{ url, headers }}` 給 `UsabilityTest/AB`,摘要頁會自動 POST 結構化結果到後端集中分析。Supabase 設定見 `docs/ut-results-supabase.md`;消費端設定檔範例 `apps/chat/src/ut/utSubmit.ts`。
 
 ## 5. 驗證
 

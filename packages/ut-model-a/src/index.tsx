@@ -100,6 +100,8 @@ const CHROME = {
     toastExcel: '測試結果 Excel 已下載到你的下載資料夾',
     toastRecProcessing: '螢幕錄影處理中,完成後會自動下載…',
     toastRecDone: '螢幕錄影已下載到你的下載資料夾',
+    toastUploaded: '結果已上傳到雲端資料庫',
+    toastUploadFail: '上傳失敗(已保留本地匯出,可手動回傳)',
     // excel/text headers
     xName: '測試名稱', xTester: '測試者', xVersion: '版本', xDate: '測試日期', xDurationMin: '耗時(分)',
     xRate: '任務達成率', xTask: '任務', xResult: '結果', xReason: '失敗原因', xDigest: '放聲思考重點',
@@ -163,6 +165,8 @@ const CHROME = {
     toastExcel: 'Result Excel downloaded to your Downloads folder',
     toastRecProcessing: 'Processing screen recording, it will download automatically…',
     toastRecDone: 'Screen recording downloaded to your Downloads folder',
+    toastUploaded: 'Result uploaded to the cloud database',
+    toastUploadFail: 'Upload failed (local export kept; you can send it manually)',
     xName: 'Test name', xTester: 'Tester', xVersion: 'Version', xDate: 'Date', xDurationMin: 'Duration (min)',
     xRate: 'Success rate', xTask: 'Task', xResult: 'Result', xReason: 'Reason', xDigest: 'Think-aloud highlights',
     xTranscript: 'Think-aloud transcript', xConclusion: 'Conclusion', xTaNote: 'Think-aloud summary',
@@ -206,6 +210,26 @@ export type SurveyAnswer = {
   value: number | string
   /** singleEase:量表上限(供「做失敗卻自評容易」分析用)。 */
   scaleMax?: number
+}
+
+/**
+ * 自動上傳設定:測試到摘要頁時,引擎會把結構化結果 POST 到 url(附 headers)。
+ * Supabase 範例:url = `${SUPABASE_URL}/rest/v1/ut_results`,
+ * headers = { apikey, Authorization: `Bearer ${anon}`, Prefer: 'return=minimal' }。
+ * 不設 = 不上傳(維持原本本地匯出)。
+ */
+export type SubmitConfig = { url: string; headers?: Record<string, string> }
+
+/** 摘要頁送出 / 上傳的結構化結果 payload(對應你後端的資料表欄位)。 */
+export type ResultPayload = {
+  test_id: string
+  kind: 'single' | 'combined'
+  variants: string
+  tester: string
+  lang: Lang
+  started_at: string
+  finished_at: string
+  result: unknown
 }
 
 /** 單一任務。check 依「任務進行期間累積的操作」判定成功與否。 */
@@ -414,13 +438,14 @@ function ToastHost({ toasts }: { toasts: ToastMsg[] }) {
   )
 }
 
-// 到摘要頁自動交付:① 立即匯出 Excel ② 螢幕錄影 blob 就緒後下載 ③ 各自跳 toast。
-function useAutoDeliver(opts: { excel: () => void; recordingBase: string; recording: boolean; recordingBlob: Blob | null; lang: Lang }): ToastMsg[] {
+// 到摘要頁自動交付:① 立即匯出 Excel ② 螢幕錄影 blob 就緒後下載 ③ (可選)上傳結果到後端 ④ 各自跳 toast。
+function useAutoDeliver(opts: { excel: () => void; recordingBase: string; recording: boolean; recordingBlob: Blob | null; lang: Lang; submit?: SubmitConfig; payload?: ResultPayload }): ToastMsg[] {
   const t = tr(opts.lang)
   const [toasts, setToasts] = useState<ToastMsg[]>([])
   const idRef = useRef(0)
   const excelOnceRef = useRef(false)
   const recOnceRef = useRef(false)
+  const submitOnceRef = useRef(false)
   function push(text: string) {
     const id = ++idRef.current
     setToasts((p) => [...p, { id, text }])
@@ -432,6 +457,17 @@ function useAutoDeliver(opts: { excel: () => void; recordingBase: string; record
     try { opts.excel() } catch { /* ignore */ }
     push(t.toastExcel)
     if (opts.recording) push(t.toastRecProcessing)
+    // 自動上傳結構化結果到後端(若有設 submit)。
+    if (opts.submit && opts.payload && !submitOnceRef.current) {
+      submitOnceRef.current = true
+      fetch(opts.submit.url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(opts.submit.headers ?? {}) },
+        body: JSON.stringify(opts.payload),
+      })
+        .then((r) => { push(r.ok ? t.toastUploaded : t.toastUploadFail) })
+        .catch(() => { push(t.toastUploadFail) })
+    }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!opts.recordingBlob || recOnceRef.current) return
@@ -1187,7 +1223,7 @@ function SurveySection({ heading, taskSurveys, postTestAnswers }: { heading: str
 }
 
 // ── 單版本結果頁 ─────────────────────────────────────────────────────────────
-function SingleResultScreen({ project, run, tester, postTestAnswers, recording, recordingBlob, onReset }: { project: UTProject<any>; run: VariantRun; tester: string; postTestAnswers: SurveyAnswer[]; recording: boolean; recordingBlob: Blob | null; onReset: () => void }) {
+function SingleResultScreen({ project, run, tester, postTestAnswers, recording, recordingBlob, submit, onReset }: { project: UTProject<any>; run: VariantRun; tester: string; postTestAnswers: SurveyAnswer[]; recording: boolean; recordingBlob: Blob | null; submit?: SubmitConfig; onReset: () => void }) {
   const lang = useLang()
   const t = tr(lang)
   const feLines = falseEasyExportLines([run], t)
@@ -1230,7 +1266,17 @@ function SingleResultScreen({ project, run, tester, postTestAnswers, recording, 
     copyToClipboard(lines.join('\n'))
   }
 
-  const toasts = useAutoDeliver({ excel, recordingBase: `UT-${project.id}-${run.variant}-${tester || 'anon'}`, recording, recordingBlob, lang })
+  const payload: ResultPayload = {
+    test_id: project.id, kind: 'single', variants: run.variant, tester: tester || '', lang,
+    started_at: run.startedAt.toISOString(), finished_at: run.finishedAt.toISOString(),
+    result: {
+      rate: run.rate, successCount: run.successCount, total: run.total,
+      outcomes: run.outcomes, transcript: run.transcript,
+      taskSurveys: run.taskSurveys, postTest: postTestAnswers,
+      falseEasy: falseEasyItems(run),
+    },
+  }
+  const toasts = useAutoDeliver({ excel, recordingBase: `UT-${project.id}-${run.variant}-${tester || 'anon'}`, recording, recordingBlob, lang, submit, payload })
 
   return (
     <>
@@ -1286,7 +1332,7 @@ function thinkAloudNote(runs: VariantRun[], t: Chrome) {
   }).join(' / ') + '。'
 }
 
-function CombinedResultScreen({ project, runs, tester, postTestAnswers, recording, recordingBlob, onReset }: { project: UTProject<any>; runs: VariantRun[]; tester: string; postTestAnswers: SurveyAnswer[]; recording: boolean; recordingBlob: Blob | null; onReset: () => void }) {
+function CombinedResultScreen({ project, runs, tester, postTestAnswers, recording, recordingBlob, submit, onReset }: { project: UTProject<any>; runs: VariantRun[]; tester: string; postTestAnswers: SurveyAnswer[]; recording: boolean; recordingBlob: Blob | null; submit?: SubmitConfig; onReset: () => void }) {
   const lang = useLang()
   const t = tr(lang)
   const conclusion = concludeMulti(runs, t)
@@ -1371,7 +1417,19 @@ function CombinedResultScreen({ project, runs, tester, postTestAnswers, recordin
     </div>
   )
 
-  const toasts = useAutoDeliver({ excel, recordingBase: `UT-${project.id}-${runs.map((r) => r.variant).join('')}-${tester || 'anon'}`, recording, recordingBlob, lang })
+  const payload: ResultPayload = {
+    test_id: project.id, kind: 'combined', variants: runs.map((r) => r.variant).join(','), tester: tester || '', lang,
+    started_at: runs[0].startedAt.toISOString(), finished_at: runs[runs.length - 1].finishedAt.toISOString(),
+    result: {
+      conclusion, thinkAloud: taNote,
+      runs: runs.map((r) => ({
+        variant: r.variant, variantLabel: r.variantLabel, rate: r.rate, successCount: r.successCount, total: r.total,
+        outcomes: r.outcomes, transcript: r.transcript, taskSurveys: r.taskSurveys, falseEasy: falseEasyItems(r),
+      })),
+      postTest: postTestAnswers,
+    },
+  }
+  const toasts = useAutoDeliver({ excel, recordingBase: `UT-${project.id}-${runs.map((r) => r.variant).join('')}-${tester || 'anon'}`, recording, recordingBlob, lang, submit, payload })
 
   return (
     <>
@@ -1412,7 +1470,7 @@ function CombinedResultScreen({ project, runs, tester, postTestAnswers, recordin
 }
 
 // ── 對外:單版本流程 ────────────────────────────────────────────────────────
-export function UsabilityTest<A>({ project, variant, password, record = false, defaultLang = 'zh', estimatedMinutes = 15 }: { project: UTProject<A>; variant: string; password?: string; record?: boolean; defaultLang?: Lang; estimatedMinutes?: number }) {
+export function UsabilityTest<A>({ project, variant, password, record = false, defaultLang = 'zh', estimatedMinutes = 15, submit }: { project: UTProject<A>; variant: string; password?: string; record?: boolean; defaultLang?: Lang; estimatedMinutes?: number; submit?: SubmitConfig }) {
   const [lang, setLang] = useState<Lang>(defaultLang)
   const [unlocked, setUnlocked] = useState(!password)
   const [phase, setPhase] = useState<'intro' | 'running' | 'posttest' | 'done'>('intro')
@@ -1449,13 +1507,13 @@ export function UsabilityTest<A>({ project, variant, password, record = false, d
   } else if (phase === 'posttest') {
     content = <SurveyStep badge={t.postTestBadge} title={t.postTestTitle} questions={postTestQs} submitLabel={t.postTestSubmit} onSubmit={(a) => { setPostTest(a); setPhase('done') }} />
   } else {
-    content = <SingleResultScreen project={project} run={run!} tester={tester} postTestAnswers={postTest} recording={record && rec.started} recordingBlob={recordingBlob} onReset={() => { setPhase('intro'); setTester(''); setRun(null); setPostTest([]); setRecordingBlob(null) }} />
+    content = <SingleResultScreen project={project} run={run!} tester={tester} postTestAnswers={postTest} recording={record && rec.started} recordingBlob={recordingBlob} submit={submit} onReset={() => { setPhase('intro'); setTester(''); setRun(null); setPostTest([]); setRecordingBlob(null) }} />
   }
   return <LangCtx.Provider value={lang}>{content}</LangCtx.Provider>
 }
 
 // ── 對外:多版本綜合流程(A→B→C…)──────────────────────────────────────────
-export function UsabilityTestAB<A>({ project, order = ['A', 'B'], password, record = false, defaultLang = 'zh', estimatedMinutes = 15 }: { project: UTProject<A>; order?: string[]; password?: string; record?: boolean; defaultLang?: Lang; estimatedMinutes?: number }) {
+export function UsabilityTestAB<A>({ project, order = ['A', 'B'], password, record = false, defaultLang = 'zh', estimatedMinutes = 15, submit }: { project: UTProject<A>; order?: string[]; password?: string; record?: boolean; defaultLang?: Lang; estimatedMinutes?: number; submit?: SubmitConfig }) {
   const [lang, setLang] = useState<Lang>(defaultLang)
   const [unlocked, setUnlocked] = useState(!password)
   const [phase, setPhase] = useState<'intro' | 'run' | 'interstitial' | 'posttest' | 'done'>('intro')
@@ -1523,7 +1581,7 @@ export function UsabilityTestAB<A>({ project, order = ['A', 'B'], password, reco
   } else if (phase === 'posttest') {
     content = <SurveyStep badge={t.postTestBadge} title={t.postTestTitle} questions={postTestQs} submitLabel={t.postTestSubmit} onSubmit={(a) => { setPostTest(a); setPhase('done') }} />
   } else {
-    content = <CombinedResultScreen project={project} runs={runs} tester={tester} postTestAnswers={postTest} recording={record && rec.started} recordingBlob={recordingBlob} onReset={reset} />
+    content = <CombinedResultScreen project={project} runs={runs} tester={tester} postTestAnswers={postTest} recording={record && rec.started} recordingBlob={recordingBlob} submit={submit} onReset={reset} />
   }
   return <LangCtx.Provider value={lang}>{content}</LangCtx.Provider>
 }
