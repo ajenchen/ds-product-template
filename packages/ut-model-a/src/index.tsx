@@ -606,14 +606,10 @@ function TaskPanel({
   const t = tr(lang)
   const [collapsed, setCollapsed] = useState(false)
   const { style, handlers } = useDraggable({ right: 24, bottom: 24 })
-  // 拖曳新手引導:每個瀏覽器只出現一次(拖過或按「知道了」後不再顯示)。
-  const [showHint, setShowHint] = useState(() => {
-    try { return localStorage.getItem('ut-drag-hint-seen') !== '1' } catch { return true }
-  })
-  function dismissHint() {
-    setShowHint(false)
-    try { localStorage.setItem('ut-drag-hint-seen', '1') } catch { /* ignore */ }
-  }
+  // 拖曳新手引導:每次進入測試都顯示(同一瀏覽器可能輪流給不同受測者),
+  // 拖過或按「知道了」後於本次測試期間隱藏。
+  const [showHint, setShowHint] = useState(true)
+  function dismissHint() { setShowHint(false) }
 
   const total = tasks.length
   const current = tasks[index]
@@ -650,10 +646,6 @@ function TaskPanel({
           className="absolute left-2 top-[46px] z-[1001] w-[248px] rounded-lg p-3 shadow-lg"
           style={{ backgroundColor: 'var(--color-neutral-9)' }}
         >
-          <div
-            className="absolute -top-1.5 left-4 h-3 w-3 rotate-45"
-            style={{ backgroundColor: 'var(--color-neutral-9)' }}
-          />
           <p style={{ fontSize: 12, lineHeight: '155%', color: '#fff' }}>{t.dragHint}</p>
           <button
             type="button"
