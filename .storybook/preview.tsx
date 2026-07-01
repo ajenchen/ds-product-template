@@ -20,8 +20,11 @@ const preview: Preview = {
     ...basePreview.parameters,
     options: {
       ...basePreview.parameters?.options,
+      // Dashboards 排在 Apps 之後、其餘(UT 等)之前 —— 讓「看結果」的儀表板獨立且好找,
+      // 不埋在 UT/(跑測試)裡。AppShell Dashboard 仍是 landing story(不改既有落地行為)。
+      // 若想讓 UserTest Results Dashboard 變成落地首頁,把 'Dashboards' 移到 'Apps' 之前即可。
       storySort: {
-        order: ['Apps', ['template', ['AppShell Dashboard', '*']]],
+        order: ['Apps', ['template', ['AppShell Dashboard', '*']], 'Dashboards'],
       },
     },
   },

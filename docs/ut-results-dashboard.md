@@ -3,7 +3,7 @@
 把 `ut_results`(受測者跑完自動上傳的結構化結果,見 `ut-results-supabase.md`)做成一個
 **掛在 Netlify 密碼後面、給 PM / designer / QA 看的可分享儀表板**,並提供 4 種導出。
 
-Dashboard 本身是一支 Storybook story(`UT/Results Dashboard`),跟你的 UT 測試一樣經 Netlify
+Dashboard 本身是一支 Storybook story(`Dashboards/UserTest Results Dashboard`),跟你的 UT 測試一樣經 Netlify
 部署 + Basic Password 保護。
 
 ---
@@ -55,7 +55,7 @@ Netlify → **Site configuration → Environment variables → Add a variable**:
 ## 三、看 + 用
 
 1. 打開你的 Netlify 站台 → 輸入 Basic Auth 帳密 → 進 Storybook。
-2. 左側 **UT / Results Dashboard → Live（讀 Supabase）**。
+2. 左側 **Dashboards → UserTest Results Dashboard → Live（讀 Supabase）**。
 3. 用右上「選擇測試」下拉切 `test_id`;分頁看:
    - **版本比較** — 各版本平均成功率 + 平均 SEQ。
    - **各任務成功率** — 各版本 × 各任務,找出哪版哪題卡關。
