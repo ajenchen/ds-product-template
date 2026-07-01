@@ -11,6 +11,7 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import {
   Button,
+  Input,
   Notice,
   Select,
   Tabs,
@@ -18,7 +19,7 @@ import {
   TabsList,
   TabsTrigger,
 } from '@qijenchen/design-system'
-import { Download, FileDown, FileText, Printer, RefreshCw } from 'lucide-react'
+import { Download, FileDown, FileText, Lock, LogOut, Printer, RefreshCw } from 'lucide-react'
 import type { Session, SurveyAnswer, UTRow } from './types'
 import { overview, taskAggregates, testIds, toSessions, variantAggregates } from './analytics'
 import { downloadText, exportFilename, printReport, quantCsv, rawCsv, transcriptCsv } from './exports'
@@ -35,8 +36,27 @@ export type UtDashboardProps = {
 
 type LoadState =
   | { status: 'idle' | 'loading' }
+  | { status: 'need-key'; message?: string; wrong?: boolean }
   | { status: 'error'; message: string; detail?: string }
   | { status: 'ready'; rows: UTRow[] }
+
+// 分析者密碼只暫存在 sessionStorage(關分頁即失效),永不進 bundle。
+const SS_DASH_KEY = 'ut_dash_key'
+function readDashKey(): string {
+  try {
+    return sessionStorage.getItem(SS_DASH_KEY) ?? ''
+  } catch {
+    return ''
+  }
+}
+function writeDashKey(v: string) {
+  try {
+    if (v) sessionStorage.setItem(SS_DASH_KEY, v)
+    else sessionStorage.removeItem(SS_DASH_KEY)
+  } catch {
+    /* sessionStorage 不可用時忽略 */
+  }
+}
 
 // ── 小工具:tone / 格式 ─────────────────────────────────────────────────────
 type Tone = 'success' | 'warning' | 'error' | 'neutral'
@@ -169,12 +189,22 @@ export function UtDashboard({ rows, endpoint = DEFAULT_ENDPOINT }: UtDashboardPr
   const [load, setLoad] = useState<LoadState>(rows ? { status: 'ready', rows } : { status: 'idle' })
   const [testId, setTestId] = useState<string>('')
   const [expanded, setExpanded] = useState<string | null>(null)
+  const [keyInput, setKeyInput] = useState<string>('')
 
-  async function fetchRows() {
+  async function fetchRows(overrideKey?: string) {
+    const dashKey = overrideKey ?? readDashKey()
     setLoad({ status: 'loading' })
     try {
-      const res = await fetch(endpoint, { headers: { accept: 'application/json' } })
+      const headers: Record<string, string> = { accept: 'application/json' }
+      if (dashKey) headers['x-ut-dashboard-key'] = dashKey
+      const res = await fetch(endpoint, { headers })
       const body = (await res.json().catch(() => ({}))) as { rows?: UTRow[]; error?: string; message?: string }
+      // 需要分析者密碼(或密碼錯誤)→ 顯示解鎖畫面,不當一般錯誤。
+      if (res.status === 401 && body.error === 'dashboard_auth_required') {
+        writeDashKey('') // 清掉不對的舊 key
+        setLoad({ status: 'need-key', message: body.message, wrong: !!dashKey })
+        return
+      }
       if (!res.ok || body.error) {
         setLoad({ status: 'error', message: body.message ?? `讀取失敗(HTTP ${res.status})`, detail: body.error })
         return
@@ -183,6 +213,18 @@ export function UtDashboard({ rows, endpoint = DEFAULT_ENDPOINT }: UtDashboardPr
     } catch (e) {
       setLoad({ status: 'error', message: '無法連到資料來源(本地 Storybook 沒有 Netlify function 屬正常)。', detail: String((e as Error)?.message ?? e) })
     }
+  }
+
+  function unlock() {
+    const k = keyInput.trim()
+    if (!k) return
+    writeDashKey(k)
+    setKeyInput('')
+    void fetchRows(k)
+  }
+  function lock() {
+    writeDashKey('')
+    setLoad({ status: 'need-key' })
   }
 
   useEffect(() => {
@@ -237,8 +279,44 @@ export function UtDashboard({ rows, endpoint = DEFAULT_ENDPOINT }: UtDashboardPr
               重新整理
             </Button>
           )}
+          {!rows && load.status === 'ready' && readDashKey() && (
+            <Button variant="tertiary" size="sm" startIcon={LogOut} onClick={lock}>
+              鎖定
+            </Button>
+          )}
         </div>
       </div>
+
+      {/* 分析者密碼閘門 */}
+      {load.status === 'need-key' && (
+        <div style={{ maxWidth: 380, margin: '56px auto 0', textAlign: 'center' }}>
+          <div
+            className="inline-flex items-center justify-center rounded-full"
+            style={{ width: 48, height: 48, backgroundColor: 'var(--color-neutral-3)', marginBottom: 12 }}
+          >
+            <Lock size={22} style={{ color: 'var(--color-neutral-7)' }} />
+          </div>
+          <h2 className="text-neutral-9" style={{ fontSize: 17, fontWeight: 600 }}>需要分析者密碼</h2>
+          <p className="text-neutral-6" style={{ fontSize: 13, marginTop: 4 }}>
+            這份結果含受測者個資,僅限負責分析的人檢視。請輸入分析者密碼。
+          </p>
+          {load.wrong && (
+            <p style={{ fontSize: 12, marginTop: 8, color: 'var(--color-error-text)' }}>密碼不正確,請再試一次。</p>
+          )}
+          <div className="flex items-center gap-2" style={{ marginTop: 16 }}>
+            <Input
+              type="password"
+              placeholder="分析者密碼"
+              value={keyInput}
+              onChange={(e) => setKeyInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') unlock() }}
+              autoFocus
+              style={{ flex: 1 }}
+            />
+            <Button variant="primary" onClick={unlock} disabled={!keyInput.trim()}>解鎖</Button>
+          </div>
+        </div>
+      )}
 
       {/* 載入 / 錯誤 / 空狀態 */}
       {load.status === 'loading' && (

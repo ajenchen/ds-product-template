@@ -29,7 +29,7 @@ service_role)** 讀(bypass RLS,不需改任何 policy)。前端只拿得到 func
 
 ---
 
-## 二、一次性設定(3 個 Netlify 環境變數)
+## 二、一次性設定(Netlify 環境變數)
 
 Netlify → **Site configuration → Environment variables → Add a variable**:
 
@@ -37,7 +37,8 @@ Netlify → **Site configuration → Environment variables → Add a variable**:
 |---|---|---|
 | `SUPABASE_URL` | `https://qjaedugymiezllhhtbgs.supabase.co` | Supabase → Settings → API Keys → Project URL |
 | `SUPABASE_SECRET_KEY` | `sb_secret_...`(**secret,勿外流 / 勿進 repo**) | Supabase → Settings → **API Keys → Secret keys** → default(點眼睛 reveal 再複製) |
-| `STORYBOOK_BASIC_AUTH` | `user:password`(站台密碼,dashboard 沿用同一組) | 你自訂;見 `netlify/edge-functions/basic-auth.ts` |
+| `STORYBOOK_BASIC_AUTH` | `user:password`(站台密碼,全站共用) | 你自訂;見 `netlify/edge-functions/basic-auth.ts` |
+| `UT_DASHBOARD_KEY` | 分析者密碼(**只給負責分析的人**) | 你自訂一組強密碼。**不進 code**,只存這裡 |
 
 > **新舊 key 制**:2026 起 Supabase 用 `sb_publishable_...` / `sb_secret_...` 取代舊的 anon / service_role。
 > 這裡要的是 **Secret key(`sb_secret_...`)**—— 它一樣 bypass RLS、一樣只能放後端。若你的專案還是舊制
@@ -49,6 +50,23 @@ Netlify → **Site configuration → Environment variables → Add a variable**:
 設完 → 下次 push main(或 Netlify **Trigger deploy**)生效。
 
 > ⚠️ **一定要設 `STORYBOOK_BASIC_AUTH`**。沒設 = 整站(含含個資的 dashboard / function)公開放行。
+
+### 兩道權限:站台密碼 vs 分析者密碼
+
+Storybook 同一個站台**同時放了 UT 測試(受測者要跑)+ 結果 dashboard(含個資)**。若只有一道站台密碼,
+拿到密碼去跑測試的人也能翻到 dashboard 看到所有人的結果。所以分兩道:
+
+| 關卡 | env var | 誰有 | 擋什麼 |
+|---|---|---|---|
+| 第一道:站台 Basic Auth | `STORYBOOK_BASIC_AUTH` | 所有需要進站台的人(含受測者) | 擋完全的陌生人 |
+| 第二道:分析者密碼 | `UT_DASHBOARD_KEY` | **只有負責分析的人** | 擋「有站台密碼但不該看結果」的人 |
+
+- 分析者密碼**只存 `UT_DASHBOARD_KEY`(Netlify env)**,`ut-data` function 在後端 constant-time 比對;
+  **絕不進前端 bundle / repo**。分析者打開 dashboard 的 **Live** 會跳「需要分析者密碼」輸入框,
+  輸入正確才載入資料(密碼暫存瀏覽器 sessionStorage,關分頁即失效;工具列「鎖定」可手動清除)。
+- 沒設 `UT_DASHBOARD_KEY` = 不啟用第二道(向後相容,回到「有站台密碼即可看」)。**要「只有分析者看得到」就一定要設。**
+- 想更硬的隔離(例:受測者根本不該碰到 dashboard 這個站),可把 dashboard 拆到另一個 Netlify 站、各自 Basic Auth;
+  但那要多維護一個站 + 兩次 deploy,一般用不到。
 
 ---
 
@@ -88,7 +106,7 @@ CSV 皆帶 UTF-8 BOM,Excel 開中文不亂碼。
 
 | 檔 | 作用 |
 |---|---|
-| `netlify/functions/ut-data.mts` | 讀取層(secret key 讀 Supabase + defense-in-depth Basic Auth)|
+| `netlify/functions/ut-data.mts` | 讀取層(secret key 讀 Supabase + Basic Auth + 分析者密碼 `UT_DASHBOARD_KEY` 閘門)|
 | `apps/chat/src/ut/dashboard/analytics.ts` | 純資料分析(normalize + 各版本 / 各任務彙總)|
 | `apps/chat/src/ut/dashboard/exports.ts` | 4 種導出(CSV × 3 + 列印)|
 | `apps/chat/src/ut/dashboard/UtDashboard.tsx` | 儀表板 UI(DS primitives + 引擎 token 視覺)|

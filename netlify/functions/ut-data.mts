@@ -17,6 +17,10 @@
 //                         也吃舊名 SUPABASE_SERVICE_ROLE_KEY(legacy service_role JWT `eyJ...`)。
 //                         兩者皆 bypass RLS、皆為 secret,只可放後端 env,絕不進前端 / repo。
 //   STORYBOOK_BASIC_AUTH  "user:password"(站台密碼,dashboard 沿用同一組)—— 見 basic-auth.ts
+//   UT_DASHBOARD_KEY      (選填)第二道「分析者密碼」。設了之後,除了站台密碼,還要再帶對這組
+//                         key 才拿得到資料 —— 用來擋「有站台密碼(能跑測試)但不該看結果」的人。
+//                         只存 Netlify env,絕不進 code;分析者在 dashboard 畫面 runtime 輸入,
+//                         經 x-ut-dashboard-key header 送來這裡比對。未設 = 不啟用此第二道關(向後相容)。
 //
 // ⚠️ header 差異(2026 Supabase 新 key 制):
 //   - 新版 secret key(sb_secret_…)只放 `apikey` header;若又放 Authorization: Bearer,
@@ -24,11 +28,20 @@
 //   - legacy service_role(eyJ… JWT)需放 Authorization: Bearer 才 bypass RLS。
 //   下面依 key 形態自動切,兩種都相容。
 
+import { createHash, timingSafeEqual } from 'node:crypto'
+
 function json(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), {
     status,
     headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
   })
+}
+
+// Constant-time 字串比對(先 SHA-256 成定長 digest,避免長度洩漏 + timing attack)。
+function safeEqual(a: string, b: string): boolean {
+  const ha = createHash('sha256').update(a).digest()
+  const hb = createHash('sha256').update(b).digest()
+  return timingSafeEqual(ha, hb)
 }
 
 export default async function handler(req: Request): Promise<Response> {
@@ -51,6 +64,15 @@ export default async function handler(req: Request): Promise<Response> {
         status: 401,
         headers: { 'WWW-Authenticate': 'Basic realm="UT Dashboard", charset="UTF-8"' },
       })
+    }
+  }
+
+  // 第二道:分析者密碼(選填)。設了 UT_DASHBOARD_KEY 才啟用 —— 擋「有站台密碼但不該看結果」的人。
+  const dashKey = (process.env.UT_DASHBOARD_KEY ?? '').trim()
+  if (dashKey) {
+    const provided = req.headers.get('x-ut-dashboard-key') ?? ''
+    if (!provided || !safeEqual(provided, dashKey)) {
+      return json({ error: 'dashboard_auth_required', message: '需要分析者密碼才能檢視結果。' }, 401)
     }
   }
 
