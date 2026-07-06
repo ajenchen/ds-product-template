@@ -316,12 +316,12 @@ export function UtDashboard({ rows, endpoint = DEFAULT_ENDPOINT }: UtDashboardPr
             />
           )}
           {!rows && (
-            <Button variant="tertiary" size="sm" startIcon={RefreshCw} onClick={() => void fetchRows()}>
+            <Button className="shrink-0" variant="tertiary" size="sm" startIcon={RefreshCw} onClick={() => void fetchRows()}>
               重新整理
             </Button>
           )}
           {!rows && load.status === 'ready' && readDashKey() && (
-            <Button variant="tertiary" size="sm" startIcon={LogOut} onClick={lock}>
+            <Button className="shrink-0" variant="tertiary" size="sm" startIcon={LogOut} onClick={lock}>
               鎖定
             </Button>
           )}
@@ -412,10 +412,10 @@ export function UtDashboard({ rows, endpoint = DEFAULT_ENDPOINT }: UtDashboardPr
 
           {/* 導出工具列(導出 = 場次明細已勾選的場次;預設全選) */}
           <div className="ut-dash-toolbar flex flex-wrap items-center gap-2" style={{ marginTop: 16 }}>
-            <Button variant="primary" size="sm" startIcon={Download} disabled={selectedSessions.length === 0} onClick={() => doExport('quant')}>量化彙總 CSV</Button>
-            <Button variant="secondary" size="sm" startIcon={FileText} disabled={selectedSessions.length === 0} onClick={() => doExport('transcript')}>逐字稿 CSV</Button>
-            <Button variant="secondary" size="sm" startIcon={FileDown} disabled={selectedSessions.length === 0} onClick={() => doExport('raw')}>原始 raw CSV</Button>
-            <Button variant="tertiary" size="sm" startIcon={Printer} onClick={printReport}>列印 / 存 PDF</Button>
+            <Button className="shrink-0" variant="primary" size="sm" startIcon={Download} disabled={selectedSessions.length === 0} onClick={() => doExport('quant')}>量化彙總 CSV</Button>
+            <Button className="shrink-0" variant="secondary" size="sm" startIcon={FileText} disabled={selectedSessions.length === 0} onClick={() => doExport('transcript')}>逐字稿 CSV</Button>
+            <Button className="shrink-0" variant="secondary" size="sm" startIcon={FileDown} disabled={selectedSessions.length === 0} onClick={() => doExport('raw')}>原始 raw CSV</Button>
+            <Button className="shrink-0" variant="tertiary" size="sm" startIcon={Printer} onClick={printReport}>列印 / 存 PDF</Button>
             <span className="text-neutral-6" style={{ fontSize: 12 }}>導出 {selectedSessions.length} / {sessions.length} 場</span>
             <Chip tone="warning">逐字稿 / raw 含個資,請妥善保管</Chip>
           </div>
