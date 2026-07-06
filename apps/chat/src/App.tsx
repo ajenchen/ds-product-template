@@ -513,16 +513,15 @@ const INITIAL_ROOMS: Room[] = [
 // 只在 config.includeTeamsRooms(Teams 整合 prototype)時注入,base story 不受影響。
 // Teams 匯入的 room 一律歸類為 general chatroom —— 連 Teams DM 也轉換成
 // general group chatroom(title = 對方名字、成員 1 人),origin:'teams' 驅動 TeamsAvatar 標示。
-const TEAMS_MIGRATED_PEOPLE: { key: string; person: Person }[] = [
-  { key: 't-sota', person: { name: 'Nakamura Sota 中村壮太', color: 'indigo', status: 'online', role: 'IT Admin', email: 'sota@teachat.app', avatar: 'https://i.pravatar.cc/96?img=60' } },
-  { key: 't-emma', person: { name: 'Emma Wright', color: 'turquoise', status: 'away', role: 'Supply Planner', email: 'emma@teachat.app', avatar: 'https://i.pravatar.cc/96?img=32' } },
-]
-TEAMS_MIGRATED_PEOPLE.forEach(({ key, person }) => { PEOPLE[key] = person })
-
+//
+// 人名刻意與既有 DM room 重複(2026-07-06 user 指定):同一個人在本 chat app 有
+// chatroom,在 Teams 平台也有 —— 搜尋該人名時 People tab 看到本人、Chatroom tab
+// 同時看到同名的原生 DM room 與 Teams 匯入 room(後者掛 TeamsAvatar 標示來源)。
+// Room name 僅含中文 / 英文(user 指定,不用日文假名或日製異體字)。
 const TEAMS_MIGRATED_ROOMS: Room[] = [
   {
     id: 'teams-tea-ops', type: 'general', origin: 'teams', title: 'Tea Ops Weekly', section: 'favorites', unread: true,
-    memberKeys: ['guanyu', 'kenji', 'yui', 't-sota'],
+    memberKeys: ['guanyu', 'kenji', 'yui', 'shinichi'],
     messages: [
       { id: 'to1', author: 'guanyu', text: 'This channel moved over from Teams — full history is preserved below.', time: '08:20' },
       { id: 'to2', author: 'kenji', text: 'Ops review stays 10:00 every Monday, same as before the migration.', time: '08:24' },
@@ -530,26 +529,37 @@ const TEAMS_MIGRATED_ROOMS: Room[] = [
     ],
   },
   {
-    // 原 Teams 1:1 DM → 轉換後成為 general group chatroom(成員只有對方 1 人)
-    id: 'teams-sota', type: 'general', origin: 'teams', title: 'Nakamura Sota 中村壮太', section: 'chats', unread: true,
-    memberKeys: ['t-sota'],
+    // 原 Teams 1:1 DM(與工藤新一)→ 轉換後成為 general group chatroom;
+    // 與既有 favorites DM「Kudo Shinichi 工藤新一」同名,展示同一人雙平台並存
+    id: 'teams-shinichi', type: 'general', origin: 'teams', title: PEOPLE.shinichi.name, section: 'chats', unread: true,
+    memberKeys: ['shinichi'],
     messages: [
-      { id: 'ts1', author: 't-sota', text: 'Your Teams chat history has been migrated — let me know if anything looks off.', time: '09:02' },
-      { id: 'ts2', author: 'me', text: 'Looks complete, thanks! Even the older attachments came through.', time: '09:05', msgStatus: 'read' },
-      { id: 'ts3', author: 't-sota', text: 'The Teams desktop client will be retired at the end of the month.', time: '09:06' },
+      { id: 'tsh1', author: 'shinichi', text: 'This is our old Teams thread — history is all here after the migration.', time: '09:02' },
+      { id: 'tsh2', author: 'me', text: 'Looks complete, thanks! Even the older attachments came through.', time: '09:05', msgStatus: 'read' },
+      { id: 'tsh3', author: 'shinichi', text: 'The Teams desktop client will be retired at the end of the month.', time: '09:06' },
     ],
   },
   {
-    id: 'teams-emma', type: 'general', origin: 'teams', title: 'Emma Wright', section: 'chats', unread: false,
-    memberKeys: ['t-emma'],
+    // 原 Teams 1:1 DM(與灰原哀)→ general group chatroom,與既有 DM 同名
+    id: 'teams-ai', type: 'general', origin: 'teams', title: PEOPLE.ai.name, section: 'chats', unread: false,
+    memberKeys: ['ai'],
     messages: [
-      { id: 'te1', author: 't-emma', text: 'Resending the packaging forecast here since we moved off Teams.', time: '5/30', date: '2026-05-30' },
-      { id: 'te2', author: 'me', text: 'Received — I will fold it into the Q3 plan.', time: '5/30', date: '2026-05-30', msgStatus: 'read' },
+      { id: 'tai1', author: 'ai', text: 'Resending the supplier sample log here since we moved off Teams.', time: '5/30', date: '2026-05-30' },
+      { id: 'tai2', author: 'me', text: 'Received — I will fold it into the Q3 cupping plan.', time: '5/30', date: '2026-05-30', msgStatus: 'read' },
+    ],
+  },
+  {
+    // 原 Teams 1:1 DM(與毛利蘭)→ general group chatroom,與既有 DM 同名
+    id: 'teams-ran', type: 'general', origin: 'teams', title: PEOPLE.ran.name, section: 'chats', unread: false,
+    memberKeys: ['ran'],
+    messages: [
+      { id: 'tra1', author: 'ran', text: 'Archiving our Teams chat here — see you on TeaChat from now on!', time: '5/27', date: '2026-05-27' },
+      { id: 'tra2', author: 'me', text: 'Welcome aboard 🍵', time: '5/27', date: '2026-05-27', msgStatus: 'read' },
     ],
   },
   {
     id: 'teams-vendor', type: 'general', origin: 'teams', title: 'Vendor Onboarding (Teams)', section: 'chats', unread: false,
-    memberKeys: ['guanyu', 'yating', 't-emma'],
+    memberKeys: ['guanyu', 'yating', 'kenji'],
     messages: [
       { id: 'tv1', author: 'yating', text: 'Checklist template is in the pinned tab, same structure as the Teams wiki.', time: '5/29', date: '2026-05-29' },
       { id: 'tv2', author: 'me', text: 'Perfect, onboarding for the new cup supplier starts next week.', time: '5/29', date: '2026-05-29', msgStatus: 'read' },
@@ -863,6 +873,20 @@ function TopSearchBar({
 }
 
 // ════════════════════════════════════════════════════════════════════════════
+// 1b. Collapsed list rail(chrome='top-search',2026-07-06)
+// ChatList 收合後,最左側出現獨立一排垂直 bar,只有最頂部一顆 Expand sidebar
+// 按鈕;點擊展開 ChatList。取代原本 ConversationHeader 內的 Expand 按鈕 + 分割線
+// (top-search chrome 下該按鈕與分割線移除,由本 rail 接手)。
+// ════════════════════════════════════════════════════════════════════════════
+function CollapsedListRail({ onExpand }: { onExpand: () => void }) {
+  return (
+    <div className="flex w-12 shrink-0 flex-col items-center border-r border-divider bg-surface py-[var(--layout-space-tight)]">
+      <ListBtn icon={PanelLeftOpen} label="Expand sidebar" onClick={onExpand} />
+    </div>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 // 2. Chat list
 // ════════════════════════════════════════════════════════════════════════════
 function AddPopover() {
@@ -1131,9 +1155,11 @@ function ChatList({
     <aside className="relative flex shrink-0 flex-col bg-surface" style={{ width }}>
       <header className="flex items-center border-b border-divider px-3" style={{ paddingTop: 10, paddingBottom: 10 }}>
         <h2 className="flex-1 truncate" style={{ fontSize: 16, fontWeight: 500, lineHeight: '130%', color: 'var(--color-neutral-9)' }}>Chats</h2>
+        {/* @layout-space-magic-ok: gap-2=8px 既有 header icon 按鈕群間距(STRUCTURE.md ChatList header spec),非 layout-space 巨觀 gap */}
         <div className="flex items-center gap-2">
           <AddPopover />
-          <ListBtn icon={Search} label="Search" onClick={onSearch} />
+          {/* top-search chrome 不傳 onSearch(universal search 在頂部 bar)→ 不渲染 Search 按鈕 */}
+          {onSearch && <ListBtn icon={Search} label="Search" onClick={onSearch} />}
           <ListBtn icon={PanelLeftClose} label="Collapse sidebar" onClick={onCollapse} />
         </div>
       </header>
@@ -1289,6 +1315,7 @@ function ConversationHeader({
   isFullWidth,
   onToggleFullWidth,
   groupAvatarMode = 'icon',
+  hideExpandControl = false,
 }: {
   room: Room
   listOpen: boolean
@@ -1298,6 +1325,8 @@ function ConversationHeader({
   isFullWidth: boolean
   onToggleFullWidth: () => void
   groupAvatarMode?: 'icon' | 'initial'
+  /** top-search chrome:收合時的 Expand 改由 CollapsedListRail 提供 → header 內按鈕 + 分割線移除 */
+  hideExpandControl?: boolean
 }) {
   const memberCount = room.memberKeys?.length ?? 0
 
@@ -1316,7 +1345,7 @@ function ConversationHeader({
 
   return (
     <header className="flex items-center gap-2 py-2 px-4 border-b border-divider bg-surface shrink-0">
-      {!listOpen && (
+      {!listOpen && !hideExpandControl && (
         <>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -2023,23 +2052,29 @@ function SearchPageView({
   // 換關鍵字即重置 preview(與 SearchModal onChange 行為一致)
   useEffect(() => { setPreview(null) }, [query])
   const previewRoom = preview ? rooms.find((r) => r.id === preview.roomId) ?? null : null
+  // 預設不顯示右側 preview;只有 Message tab 點了某則訊息,preview 欄位才出現
+  const previewOpen = tab === 'message' && !!previewRoom && !!preview
+
+  const resultsColumn = (
+    <SearchResultsColumn
+      rooms={rooms}
+      q={q}
+      tab={tab}
+      onTabChange={setTab}
+      previewMessageId={preview?.messageId ?? null}
+      onNavigateRoom={onNavigateRoom}
+      onPickMessage={(roomId, messageId) => setPreview({ roomId, messageId, token: Date.now() })}
+    />
+  )
 
   return (
     <section className="flex min-w-0 flex-1 bg-surface">
-      <div className="flex w-[480px] min-w-0 shrink-0 flex-col border-r border-divider">
-        <SearchResultsColumn
-          rooms={rooms}
-          q={q}
-          tab={tab}
-          onTabChange={setTab}
-          previewMessageId={preview?.messageId ?? null}
-          onNavigateRoom={onNavigateRoom}
-          onPickMessage={(roomId, messageId) => setPreview({ roomId, messageId, token: Date.now() })}
-        />
-      </div>
-      <div className="flex min-w-0 flex-1 flex-col bg-canvas">
-        {tab === 'message' && previewRoom && preview ? (
-          <>
+      {previewOpen && previewRoom && preview ? (
+        <>
+          <div className="flex w-[480px] min-w-0 shrink-0 flex-col border-r border-divider">
+            {resultsColumn}
+          </div>
+          <div className="flex min-w-0 flex-1 flex-col bg-canvas">
             <MessagePreviewHeader room={previewRoom} onViewMessage={() => onViewMessage(preview.roomId, preview.messageId)} />
             <MessageArea
               room={previewRoom}
@@ -2050,16 +2085,14 @@ function SearchPageView({
               flashToken={preview.token}
               scrollToMessageId={preview.messageId}
             />
-          </>
-        ) : (
-          <div className="flex flex-1 flex-col items-center justify-center gap-[var(--layout-space-tight)] px-[var(--layout-space-loose)] text-center">
-            <Search size={28} style={{ color: 'var(--color-neutral-5)' }} />
-            <p style={{ fontSize: 13, color: 'var(--color-neutral-7)' }}>
-              {tab === 'message' ? 'Select a message to preview it here' : 'Search results are shown on the left'}
-            </p>
           </div>
-        )}
-      </div>
+        </>
+      ) : (
+        // 無 preview → 結果列表置中於視窗中間、左右 padding(類似 fullWidth OFF 的 880px 置中效果)
+        <div className="mx-auto flex w-full min-w-0 flex-col px-[var(--layout-space-loose)]" style={{ maxWidth: 880 }}>
+          {resultsColumn}
+        </div>
+      )}
     </section>
   )
 }
@@ -2425,6 +2458,7 @@ function Conversation({
   lastReadMessageId,
   flashMessageId,
   flashToken,
+  hideExpandControl = false,
 }: {
   room: Room
   listOpen: boolean
@@ -2441,6 +2475,7 @@ function Conversation({
   // Jump-from-search: scrolls to + one-time-flashes (indigo-6) this message.
   flashMessageId?: string | null
   flashToken?: number
+  hideExpandControl?: boolean
 }) {
   // Track the thread root by id (not a snapshot) so the panel re-reads live
   // room state and shows newly sent replies immediately.
@@ -2472,6 +2507,7 @@ function Conversation({
             isFullWidth={fullWidth}
             onToggleFullWidth={onToggleFullWidth}
             groupAvatarMode={groupAvatarMode}
+            hideExpandControl={hideExpandControl}
           />
           <MessageArea
             room={room}
@@ -2690,6 +2726,10 @@ export default function App({
       {chrome === 'nav-rail' && (
         <NavRail unreadCount={unreadCount} onOpenSettings={() => { setSettingsOpen(true); onAction?.({ type: 'open-settings' }) }} />
       )}
+        {/* top-search chrome:ChatList 收合後,最左側獨立垂直 bar 只放 Expand 按鈕 */}
+        {chrome === 'top-search' && !listOpen && (
+          <CollapsedListRail onExpand={() => setListOpen(true)} />
+        )}
         {listOpen && (
           <ChatList
             rooms={rooms}
@@ -2704,7 +2744,7 @@ export default function App({
             onToggleMute={handleToggleMute}
             onToggleFavorite={handleToggleFavorite}
             groupAvatarMode={groupAvatarMode}
-            onSearch={() => setSearchOpen(true)}
+            onSearch={chrome === 'nav-rail' ? () => setSearchOpen(true) : undefined}
           />
         )}
         {topSearching ? (
@@ -2731,6 +2771,7 @@ export default function App({
             lastReadMessageId={lastReadDivider?.roomId === current.id ? lastReadDivider.messageId : null}
             flashMessageId={flash?.roomId === current.id ? flash.messageId : null}
             flashToken={flash?.roomId === current.id ? flash.token : undefined}
+            hideExpandControl={chrome === 'top-search'}
           />
         )}
     </>

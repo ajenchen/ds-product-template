@@ -30,6 +30,7 @@ App
 └── div.flex.h-screen.flex-col
     ├── TopSearchBar            頂部 chrome（取代 NavRail，見 §1a）
     └── div.flex.min-h-0.flex-1 ← 2-column（NavRail 移除）
+        ├── CollapsedListRail（僅 ChatList 收合時，見 §1b）
         ├── ChatList
         └── Conversation ⇄ SearchPageView（universal search 有值時整區換成全頁搜尋結果，見 §1a）
 ```
@@ -90,9 +91,17 @@ TopSearchBar  (header，h=48px，border-b，grid-cols-[1fr_auto_1fr])
 
 - `grid-cols-[1fr_auto_1fr]` 讓 search input 永遠在視窗正中間，不受左右內容寬度影響；input 寬 `min(480px, 40vw)`。
 - **輸入框有值 → 全頁結果**：App `topSearching`（`chrome==='top-search' && topQuery 非空`）時，`SearchPageView` **覆蓋整個 Conversation view 的位置成為頁面的一部分（非浮窗 panel）**；清空關鍵字（X / Escape / 手動刪除）即回到 Conversation。
-- `SearchPageView`：左欄 480px = `SearchResultsColumn`（與 SearchModal 共用的 People/Chatroom/Message 三 tab 結果列表，單一 SSOT 不重複 markup）；Message 結果點擊 → 右側唯讀 preview（`MessagePreviewHeader` + `MessageArea readOnly` + flash/scroll，與 modal 行為一致）；「View message」→ 關閉搜尋、切 room、主畫面 flash 該訊息。People/Chatroom 結果點擊 → 直接切 room 並退出搜尋。
+- `SearchPageView`（2026-07-06 v3 版面）：**預設看不到右側 preview** —— 結果列表置中於視窗中間、左右 padding（`maxWidth: 880` 置中，類似 fullWidth OFF 效果）。**只有 Message tab 點擊某則訊息後**，版面才切成兩欄：左欄 480px 結果列表 + 右側唯讀 preview（`MessagePreviewHeader` + `MessageArea readOnly` + flash/scroll）。「View message」→ 關閉搜尋、切 room、主畫面 flash 該訊息。People/Chatroom 結果點擊 → 直接切 room 並退出搜尋。結果列表 = `SearchResultsColumn`（與 SearchModal 共用，單一 SSOT）。
+- **ChatList header 差異（top-search chrome）**：Search 按鈕移除（`onSearch` 不傳即不渲染；universal search 已在頂部 bar）。
+- **收合行為（top-search chrome，2026-07-06 v3）**：ChatList 收合後，最左側出現 `CollapsedListRail`（§1b）—— 獨立垂直 bar、只有最頂部一顆 Expand sidebar 按鈕；原 ConversationHeader 內的 Expand 按鈕 + 右側分割線移除（`hideExpandControl` prop 貫穿 Conversation → ConversationHeader）。
 - NavRail 的 Home / Chats tab 與未讀 badge 不搬移（此 prototype 只有 chat 一個 surface）。
 - 頂部 chrome spacing 走 `--layout-space-*` token；48px 高度為 documented escape（對齊 Teams top bar）。
+
+---
+
+## 1b. Collapsed list rail — `function CollapsedListRail`（chrome='top-search'，2026-07-06 v3）
+
+ChatList 收合（`listOpen=false`）時渲染在最左側的獨立垂直 bar（`w-12` 48px，`border-r`，`bg-surface`），內容只有最頂部一顆 `ListBtn icon={PanelLeftOpen}`「Expand sidebar」；點擊展開 ChatList。nav-rail chrome 不渲染（維持 base 行為：Expand 按鈕在 ConversationHeader 內）。
 
 ---
 
@@ -234,7 +243,7 @@ type Room    = { id; name; type; origin?: 'teams'; section: 'favorites' | 'chats
 
 Inline image（`message.images`）用 `UNSPLASH(id)` helper 產生 `images.unsplash.com` 直連圖片 URL（允許 hotlink、穩定，用 `?w=480&h=300&fit=crop` 控制尺寸）。之前用 `picsum.photos` 會因 ad-blocker/firewall/403 host_not_allowed 而變破圖。
 
-Teams 匯入 demo 資料（2026-07-06 new）：`TEAMS_MIGRATED_PEOPLE`（2 位，註冊進 PEOPLE map）+ `TEAMS_MIGRATED_ROOMS`（4 間：favorites 1 + chats 3，含 2 間「Teams DM 轉 general group」範例）。**只在 `config.includeTeamsRooms` 時由 `withTeamsRooms()` 注入**（favorites 排在既有最愛後、chats 穿插在既有列表前段），base story 完全不受影響。`TeamsAvatar`：圓形底色 = Teams 品牌色 `TEAMS_BRAND = '#5B5FC7'`（source: microsoft/fluentui `packages/tokens/src/global/brandColors.ts` `brandTeams[80]`），白色 Teams logo 線條 SVG（rounded-square「T」+ 人形剪影簡化單色版），icon 佔 avatar 62%。
+Teams 匯入 demo 資料（2026-07-06 new，同日 v3 改版）：`TEAMS_MIGRATED_ROOMS`（5 間：favorites 1 + chats 4，含 3 間「Teams DM 轉 general group」範例）。**DM 轉換房的人名刻意與既有 DM room 重複**（工藤新一 / 灰原哀 / 毛利蘭 — 同一人在本 app 有 chatroom、在 Teams 也有；搜尋人名時 People tab 與 Chatroom tab 會同時出現同名結果，Teams 房掛 TeamsAvatar 區分）。Room name 僅含中文 / 英文（原 `TEAMS_MIGRATED_PEOPLE`（中村壮太 / Emma Wright）已移除）。**只在 `config.includeTeamsRooms` 時由 `withTeamsRooms()` 注入**（favorites 排在既有最愛後、chats 穿插在既有列表前段），base story 完全不受影響。`TeamsAvatar`：圓形底色 = Teams 品牌色 `TEAMS_BRAND = '#5B5FC7'`（source: microsoft/fluentui `packages/tokens/src/global/brandColors.ts` `brandTeams[80]`），白色 Teams logo 線條 SVG（rounded-square「T」+ 人形剪影簡化單色版），icon 佔 avatar 62%。
 
 假資料常數：`PEOPLE`（柯南角色）· `ME` · `INITIAL_ROOMS`（含長訊息 + inline image 範例 + `semi-sales`「IT Sales - Table格式範例」chatroom 的 table 範例：少欄少列 forecast/utilization(hug 範例) + 30 欄 22 列 wafer starts 大表(達 max-h 320px 觸發 hover scrollbar + 水平捲動範例)）· `COMMON_EMOJI`。
 App 以 `useState(INITIAL_ROOMS)` 管理 rooms，`handleSend` 在 active room 尾端 append 新訊息。
