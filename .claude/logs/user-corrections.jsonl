@@ -1,1 +1,1 @@
-{"ts":"2026-07-06T22:52:58Z","session":"0a7a4a21-ca7a-5145-b497-a5a8eef9c357","count":4,"sample":"- **與使用者的所有問答一律用「繁體中文」**:用 `AskUserQuestion` 釐清需求時,問題、選項標題(label)、選項說明(description)全部都要繁體中文,不要用英文。\n3. **不要修改 `packages/ut-model-a/`** —— 那是鎖定的模型。所有客製都在消費端(`apps/<app>/src/...`)。\n"}
+{"ts":"2026-07-06T22:53:35Z","session":"0a7a4a21-ca7a-5145-b497-a5a8eef9c357","count":4,"sample":"- **與使用者的所有問答一律用「繁體中文」**:用 `AskUserQuestion` 釐清需求時,問題、選項標題(label)、選項說明(description)全部都要繁體中文,不要用英文。\n3. **不要修改 `packages/ut-model-a/`** —— 那是鎖定的模型。所有客製都在消費端(`apps/<app>/src/...`)。\n"}
