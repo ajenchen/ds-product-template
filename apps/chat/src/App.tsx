@@ -27,6 +27,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuSubContent,
   ResizeHandle,
+  Input,
   Dialog,
   DialogContent,
   DialogHeader,
@@ -192,6 +193,9 @@ type Message = {
 type Room = {
   id: string
   type: 'dm' | 'general'
+  // Rooms migrated from Microsoft Teams. Teams DMs are converted to general
+  // group chatrooms too, so origin==='teams' always pairs with type:'general'.
+  origin?: 'teams'
   title: string
   section: 'favorites' | 'chats'
   unread: boolean
@@ -505,6 +509,54 @@ const INITIAL_ROOMS: Room[] = [
   ...GENERATED_CHAT_ROOMS,
 ]
 
+// ── Microsoft Teams 匯入 demo 資料 ───────────────────────────────────────────
+// 只在 config.includeTeamsRooms(Teams 整合 prototype)時注入,base story 不受影響。
+// Teams 匯入的 room 一律歸類為 general chatroom —— 連 Teams DM 也轉換成
+// general group chatroom(title = 對方名字、成員 1 人),origin:'teams' 驅動 TeamsAvatar 標示。
+const TEAMS_MIGRATED_PEOPLE: { key: string; person: Person }[] = [
+  { key: 't-sota', person: { name: 'Nakamura Sota 中村壮太', color: 'indigo', status: 'online', role: 'IT Admin', email: 'sota@teachat.app', avatar: 'https://i.pravatar.cc/96?img=60' } },
+  { key: 't-emma', person: { name: 'Emma Wright', color: 'turquoise', status: 'away', role: 'Supply Planner', email: 'emma@teachat.app', avatar: 'https://i.pravatar.cc/96?img=32' } },
+]
+TEAMS_MIGRATED_PEOPLE.forEach(({ key, person }) => { PEOPLE[key] = person })
+
+const TEAMS_MIGRATED_ROOMS: Room[] = [
+  {
+    id: 'teams-tea-ops', type: 'general', origin: 'teams', title: 'Tea Ops Weekly', section: 'favorites', unread: true,
+    memberKeys: ['guanyu', 'kenji', 'yui', 't-sota'],
+    messages: [
+      { id: 'to1', author: 'guanyu', text: 'This channel moved over from Teams — full history is preserved below.', time: '08:20' },
+      { id: 'to2', author: 'kenji', text: 'Ops review stays 10:00 every Monday, same as before the migration.', time: '08:24' },
+      { id: 'to3', author: 'me', text: 'Great, agenda doc is pinned. See everyone Monday.', time: '08:31', msgStatus: 'read' },
+    ],
+  },
+  {
+    // 原 Teams 1:1 DM → 轉換後成為 general group chatroom(成員只有對方 1 人)
+    id: 'teams-sota', type: 'general', origin: 'teams', title: 'Nakamura Sota 中村壮太', section: 'chats', unread: true,
+    memberKeys: ['t-sota'],
+    messages: [
+      { id: 'ts1', author: 't-sota', text: 'Your Teams chat history has been migrated — let me know if anything looks off.', time: '09:02' },
+      { id: 'ts2', author: 'me', text: 'Looks complete, thanks! Even the older attachments came through.', time: '09:05', msgStatus: 'read' },
+      { id: 'ts3', author: 't-sota', text: 'The Teams desktop client will be retired at the end of the month.', time: '09:06' },
+    ],
+  },
+  {
+    id: 'teams-emma', type: 'general', origin: 'teams', title: 'Emma Wright', section: 'chats', unread: false,
+    memberKeys: ['t-emma'],
+    messages: [
+      { id: 'te1', author: 't-emma', text: 'Resending the packaging forecast here since we moved off Teams.', time: '5/30', date: '2026-05-30' },
+      { id: 'te2', author: 'me', text: 'Received — I will fold it into the Q3 plan.', time: '5/30', date: '2026-05-30', msgStatus: 'read' },
+    ],
+  },
+  {
+    id: 'teams-vendor', type: 'general', origin: 'teams', title: 'Vendor Onboarding (Teams)', section: 'chats', unread: false,
+    memberKeys: ['guanyu', 'yating', 't-emma'],
+    messages: [
+      { id: 'tv1', author: 'yating', text: 'Checklist template is in the pinned tab, same structure as the Teams wiki.', time: '5/29', date: '2026-05-29' },
+      { id: 'tv2', author: 'me', text: 'Perfect, onboarding for the new cup supplier starts next week.', time: '5/29', date: '2026-05-29', msgStatus: 'read' },
+    ],
+  },
+]
+
 const COMMON_EMOJI = ['👍', '❤️', '😂', '🎉']
 
 // ── Status dot ────────────────────────────────────────────────────────────────
@@ -559,6 +611,31 @@ function GroupAvatar({ size = 32 }: { size?: number }) {
       shape="circle"
       className="[&>div]:!bg-[var(--color-neutral-6)] [&>div]:!text-[var(--on-emphasis)]"
     />
+  )
+}
+
+// Microsoft Teams 匯入聊天室頭像 — 圓形底色 = Teams 品牌色 brand80 #5B5FC7
+// (source: microsoft/fluentui packages/tokens/src/global/brandColors.ts,brandTeams[80]),
+// icon 為白色 Teams logo 線條(rounded-square「T」+ 人形剪影的簡化單色版)。
+const TEAMS_BRAND = '#5B5FC7'
+function TeamsAvatar({ size = 32 }: { size?: number }) {
+  const icon = Math.round(size * 0.62)
+  return (
+    <div
+      className="flex shrink-0 items-center justify-center rounded-full"
+      style={{ width: size, height: size, backgroundColor: TEAMS_BRAND }}
+      role="img"
+      aria-label="Migrated from Microsoft Teams"
+    >
+      <svg width={icon} height={icon} viewBox="0 0 24 24" aria-hidden="true">
+        {/* person silhouette (head + shoulder), right side */}
+        <circle cx="17.4" cy="7.3" r="2.5" fill="white" />
+        <path d="M14.6 11.2h5.1c.5 0 .9.4.9.9v4.2c0 2.4-1.9 4.3-4.3 4.3-.6 0-1.2-.1-1.7-.4V11.2Z" fill="white" />
+        {/* rounded square with the "T" knocked out in the brand color */}
+        <rect x="2.4" y="6.2" width="11.2" height="11.2" rx="2" fill="white" />
+        <path d="M5.4 9.8h5.2M8 9.8v5.9" stroke={TEAMS_BRAND} strokeWidth="1.8" strokeLinecap="round" fill="none" />
+      </svg>
+    </div>
   )
 }
 
@@ -711,6 +788,57 @@ function NavRail({ unreadCount, onOpenSettings }: { unreadCount: number; onOpenS
 }
 
 // ════════════════════════════════════════════════════════════════════════════
+// 1a. Top search bar(chrome='top-search',Teams 整合 prototype)
+// NavRail 移除後的頂部 chrome:logo 靠左、universal search 置中(點擊開啟既有
+// SearchModal,對齊 Teams / Slack top-bar search),NavRail 原有的 More
+// DropdownMenu + 我的頭像移到最右(由右至左:PersonAvatar → DropdownMenu)。
+// grid-cols-[1fr_auto_1fr] 讓 search bar 永遠落在視窗正中間,不受左右內容寬度影響。
+// ════════════════════════════════════════════════════════════════════════════
+function TopSearchBar({ onOpenSettings, onSearch }: { onOpenSettings: () => void; onSearch: () => void }) {
+  const moreLabelId = useId()
+  return (
+    <header className="grid shrink-0 grid-cols-[1fr_auto_1fr] items-center border-b border-divider bg-surface px-3" style={{ height: 48 }}>
+      <div className="flex items-center">
+        <Logo />
+      </div>
+      {/* 正中間的 universal search input — readOnly trigger,click / Enter 都開 SearchModal */}
+      <div style={{ width: 'min(480px, 40vw)' }} onClick={onSearch}>
+        <Input
+          startIcon={Search}
+          placeholder="search"
+          readOnly
+          aria-label="Search"
+          className="w-full cursor-pointer [&>input]:cursor-pointer"
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSearch() } }}
+        />
+      </div>
+      <div className="flex items-center justify-end gap-1">
+        {/* More menu — same items as the NavRail version; aria-labelledby (not string aria-label)
+            avoids the DS iconOnly auto-tooltip so we keep a single bottom-side tooltip */}
+        <DropdownMenu>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <DropdownMenuTrigger asChild>
+                <Button variant="text" size="md" iconOnly startIcon={MoreHorizontal} aria-labelledby={moreLabelId} className="!h-8 !w-8 !min-w-0 !p-0" />
+              </DropdownMenuTrigger>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">More</TooltipContent>
+            <span id={moreLabelId} className="sr-only">More</span>
+          </Tooltip>
+          <DropdownMenuContent align="end" side="bottom" sideOffset={8}>
+            <DropdownMenuItem startIcon={Settings} onSelect={onOpenSettings}>Settings</DropdownMenuItem>
+            <DropdownMenuItem startIcon={HelpCircle}>Help</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem startIcon={LogOut}>Sign out</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <Avatar src={ME.avatar} alt={ME.name} color={ME.color} size={32} hoverCard={makeProfileCard(ME)} />
+      </div>
+    </header>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 // 2. Chat list
 // ════════════════════════════════════════════════════════════════════════════
 function AddPopover() {
@@ -846,9 +974,11 @@ function RoomRow({
       } ${active ? 'bg-neutral-selected' : 'hover:bg-neutral-hover'}`}
       onClick={() => onSelect(room.id)}
     >
-      {/* Avatar */}
+      {/* Avatar — muted > teams > dm > group */}
       {isMuted ? (
         <MutedAvatar size={avatarSize} />
+      ) : room.origin === 'teams' ? (
+        <TeamsAvatar size={avatarSize} />
       ) : room.type === 'dm' && room.person ? (
         <PersonAvatar person={room.person} size={avatarSize} dotSize={showPreview ? 8 : 6} />
       ) : groupAvatarMode === 'initial' ? (
@@ -1150,6 +1280,8 @@ function ConversationHeader({
   // When muted: 32×32 white bg + gray BellOff icon fully replaces the avatar
   const roomAvatar = isMuted ? (
     <MutedAvatar size={32} />
+  ) : room.origin === 'teams' ? (
+    <TeamsAvatar size={32} />
   ) : room.type === 'dm' && room.person ? (
     <PersonAvatar person={room.person} size={32} />
   ) : groupAvatarMode === 'initial' ? (
@@ -1725,7 +1857,7 @@ function NoSearchResults() {
 }
 
 function MessagePreviewHeader({ room, onViewMessage }: { room: Room; onViewMessage: () => void }) {
-  const roomAvatar = room.type === 'dm' && room.person ? <PersonAvatar person={room.person} size={32} /> : <GroupAvatar size={32} />
+  const roomAvatar = room.origin === 'teams' ? <TeamsAvatar size={32} /> : room.type === 'dm' && room.person ? <PersonAvatar person={room.person} size={32} /> : <GroupAvatar size={32} />
   return (
     <header className="flex shrink-0 items-center gap-2 border-b border-divider bg-surface px-4 py-2">
       {roomAvatar}
@@ -1826,7 +1958,7 @@ function SearchModal({
                     onClick={() => onNavigateRoom(r.id)}
                     className="flex w-full items-center gap-3 px-4 py-2 text-left hover:bg-neutral-hover"
                   >
-                    {r.type === 'dm' && r.person ? <PersonAvatar person={r.person} size={32} /> : <GroupAvatar size={32} />}
+                    {r.origin === 'teams' ? <TeamsAvatar size={32} /> : r.type === 'dm' && r.person ? <PersonAvatar person={r.person} size={32} /> : <GroupAvatar size={32} />}
                     <div className="min-w-0 flex-1">
                       <div className="truncate" style={{ fontSize: 14, fontWeight: 500 }}>{r.title}</div>
                       <div className="truncate" style={{ fontSize: 12, color: 'var(--color-neutral-7)' }}>
@@ -2257,6 +2389,13 @@ export type ChatVariantConfig = {
   groupAvatarMode?: 'icon' | 'initial'
   /** 各版本用不同 seed 打散聊天室排序,避免受測者背誦順序影響結果(同 seed 內順序穩定)。 */
   roomOrderSeed?: number
+  /**
+   * 頂部 chrome 佈局:'nav-rail'(預設,左側 icon 導覽欄)/ 'top-search'(Teams 整合
+   * prototype:NavRail 移除,頂部改為 universal search bar,More menu + 我的頭像移到最右)。
+   */
+  chrome?: 'nav-rail' | 'top-search'
+  /** 注入 Microsoft Teams 匯入的聊天室 demo 資料(全部 general chatroom,TeamsAvatar 標示)。預設 false。 */
+  includeTeamsRooms?: boolean
 }
 
 // 依 seed 做穩定洗牌(各版本不同 seed → 不同排序,但同版本每次一致)。
@@ -2270,11 +2409,21 @@ function seededShuffle<T>(arr: T[], seed: number): T[] {
   }
   return a
 }
-// 依 roomOrderSeed 重排 INITIAL_ROOMS(favorites / chats 各自打散,保留分組)。未給 seed → 原序。
-function orderedRooms(seed?: number): Room[] {
-  if (seed == null) return INITIAL_ROOMS
-  const favs = seededShuffle(INITIAL_ROOMS.filter((r) => r.section === 'favorites'), seed)
-  const chats = seededShuffle(INITIAL_ROOMS.filter((r) => r.section !== 'favorites'), (seed ^ 0x9e3779b9) >>> 0)
+// Teams 匯入 room 注入:favorites 排在既有最愛之後;chats 穿插在既有列表前段
+// (migrated 室近期仍活躍,排前面才看得到標示),不打亂其餘既有順序。
+function withTeamsRooms(rooms: Room[]): Room[] {
+  const favs = rooms.filter((r) => r.section === 'favorites')
+  const chats = rooms.filter((r) => r.section !== 'favorites')
+  const tFavs = TEAMS_MIGRATED_ROOMS.filter((r) => r.section === 'favorites')
+  const tChats = TEAMS_MIGRATED_ROOMS.filter((r) => r.section !== 'favorites')
+  return [...favs, ...tFavs, ...chats.slice(0, 2), ...tChats, ...chats.slice(2)]
+}
+// 依 roomOrderSeed 重排 rooms(favorites / chats 各自打散,保留分組)。未給 seed → 原序。
+function orderedRooms(seed?: number, includeTeams?: boolean): Room[] {
+  const base = includeTeams ? withTeamsRooms(INITIAL_ROOMS) : INITIAL_ROOMS
+  if (seed == null) return base
+  const favs = seededShuffle(base.filter((r) => r.section === 'favorites'), seed)
+  const chats = seededShuffle(base.filter((r) => r.section !== 'favorites'), (seed ^ 0x9e3779b9) >>> 0)
   return [...favs, ...chats]
 }
 
@@ -2292,8 +2441,8 @@ export default function App({
   config,
   onAction,
 }: { config?: ChatVariantConfig; onAction?: (a: ChatAction) => void } = {}) {
-  const [rooms, setRooms] = useState<Room[]>(() => orderedRooms(config?.roomOrderSeed))
-  const [activeId, setActiveId] = useState<string>(() => orderedRooms(config?.roomOrderSeed)[0].id)
+  const [rooms, setRooms] = useState<Room[]>(() => orderedRooms(config?.roomOrderSeed, config?.includeTeamsRooms))
+  const [activeId, setActiveId] = useState<string>(() => orderedRooms(config?.roomOrderSeed, config?.includeTeamsRooms)[0].id)
   const [listOpen, setListOpen] = useState(config?.initialListOpen ?? true)
   const [listWidth, setListWidth] = useState(320)
   const [showPreview, setShowPreview] = useState(config?.initialShowPreview ?? true)
@@ -2301,7 +2450,7 @@ export default function App({
   const [mutedIds, setMutedIds] = useState<Set<string>>(new Set())
   const [fullWidth, setFullWidth] = useState(config?.initialFullWidth ?? true)
   const [favOrder, setFavOrder] = useState<string[]>(
-    () => orderedRooms(config?.roomOrderSeed).filter((r) => r.section === 'favorites').map((r) => r.id)
+    () => orderedRooms(config?.roomOrderSeed, config?.includeTeamsRooms).filter((r) => r.section === 'favorites').map((r) => r.id)
   )
   // The "Last read" divider only shows for the room/message captured at the
   // moment an unread room is opened, and is cleared the instant the user
@@ -2315,6 +2464,7 @@ export default function App({
   const current = rooms.find((r) => r.id === activeId) ?? rooms[0]
   const unreadCount = rooms.filter((r) => r.unread && !mutedIds.has(r.id)).length
   const groupAvatarMode = config?.groupAvatarMode ?? 'icon'
+  const chrome = config?.chrome ?? 'nav-rail'
 
   function handleToggleMute(id: string) {
     const willMute = !mutedIds.has(id)
@@ -2392,10 +2542,12 @@ export default function App({
     }))
   }
 
-  return (
-    <TooltipProvider delayDuration={400} skipDelayDuration={200}>
-      <div className="flex h-screen w-full overflow-hidden bg-canvas text-foreground">
+  // 三欄主體(chrome='top-search' 時 NavRail 移除,由頂部 TopSearchBar 取代)
+  const columns = (
+    <>
+      {chrome === 'nav-rail' && (
         <NavRail unreadCount={unreadCount} onOpenSettings={() => { setSettingsOpen(true); onAction?.({ type: 'open-settings' }) }} />
+      )}
         {listOpen && (
           <ChatList
             rooms={rooms}
@@ -2429,7 +2581,22 @@ export default function App({
           flashMessageId={flash?.roomId === current.id ? flash.messageId : null}
           flashToken={flash?.roomId === current.id ? flash.token : undefined}
         />
-      </div>
+    </>
+  )
+
+  return (
+    <TooltipProvider delayDuration={400} skipDelayDuration={200}>
+      {chrome === 'top-search' ? (
+        <div className="flex h-screen w-full flex-col overflow-hidden bg-canvas text-foreground">
+          <TopSearchBar
+            onOpenSettings={() => { setSettingsOpen(true); onAction?.({ type: 'open-settings' }) }}
+            onSearch={() => setSearchOpen(true)}
+          />
+          <div className="flex min-h-0 flex-1">{columns}</div>
+        </div>
+      ) : (
+        <div className="flex h-screen w-full overflow-hidden bg-canvas text-foreground">{columns}</div>
+      )}
       <SettingsModal
         open={settingsOpen}
         onOpenChange={setSettingsOpen}

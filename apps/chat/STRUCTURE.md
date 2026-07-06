@@ -1,6 +1,6 @@
 # TeaChat Chat Prototype — 結構文件
 
-單一檔案 prototype：`apps/chat/src/App.tsx`（約 1440 行）。本文件記錄元件樹、命名與職責，方便 onboarding 與對照修改。
+單一檔案 prototype：`apps/chat/src/App.tsx`（約 2600 行）。本文件記錄元件樹、命名與職責，方便 onboarding 與對照修改。
 
 > 消費 `@qijenchen/design-system`（public surface only）。詳見 repo 根目錄 `CLAUDE.md`。
 
@@ -15,11 +15,23 @@
 ```
 App  (export default)
 ├── TooltipProvider
-└── div.flex.h-screen          ← 3-column 主框架
+└── div.flex.h-screen          ← 3-column 主框架（chrome='nav-rail'，預設）
     ├── NavRail                 最左窄欄（icon 導覽）
     ├── ChatList                中欄（聊天列表，可收合 / 可拉寬）
     └── Conversation            右側主區（對話 + Thread panel）
     └── SettingsModal           overlay，由 NavRail more → Settings 開啟
+```
+
+`config.chrome === 'top-search'`（Teams 整合 prototype，story `Apps/chat/Teams Integration`，檔案 `TeamsChat.stories.tsx`）時改為：
+
+```
+App
+├── TooltipProvider
+└── div.flex.h-screen.flex-col
+    ├── TopSearchBar            頂部 chrome（取代 NavRail，見 §1a）
+    └── div.flex.min-h-0.flex-1 ← 2-column（NavRail 移除）
+        ├── ChatList
+        └── Conversation
 ```
 
 ---
@@ -55,6 +67,26 @@ NavRail
 - `NavBtn`：共用按鈕。tooltip 強制在右側（`side="right" avoidCollisions={false}`）。
   - **重要**：DS Button 在 `iconOnly` + **string** `aria-label` 時會自動補一個 side="top" 的 tooltip（無法調位置）→ 會出現雙 tooltip。解法：**不傳 string `aria-label`**，改用 `aria-labelledby` 指向 sr-only span 保住無障礙名稱，讓 DS auto-tooltip 條件失效，只剩我們 right-side 的單一 tooltip。此規則僅 apply 在 nav rail 按鈕。
 - **尺寸 spec（2026-06-18 confirmed）**：`<nav>` 左右 `px-2`=8px + 按鈕 `!h-8 !w-8`=32×32 → 整體寬 `w-12`=48px（8+32+8）。按鈕間距 `gap-1`=4px。Chat tab 未讀 badge `<Badge variant="critical">` 加 `className="!bg-[#EC540F]"` 對齊 `bg/notification` token。More 按鈕同套 `!h-8 !w-8` 32×32 對齊。
+
+---
+
+## 1a. Top search bar — `function TopSearchBar`（chrome='top-search'，2026-07-06 new）
+
+Teams 整合 prototype（story `Apps/chat/Teams Integration`）的頂部 chrome，`config.chrome === 'top-search'` 時取代 NavRail：
+
+```
+TopSearchBar  (header，h=48px，border-b，grid-cols-[1fr_auto_1fr])
+├── Logo                        靠左（沿用 NavRail 的 Logo）
+├── Universal search input      正中間（DS Input + startIcon Search，placeholder "search"，
+│                               readOnly trigger：click / Enter / Space 開啟既有 SearchModal）
+└── 右側（由右至左：PersonAvatar → DropdownMenu）
+    ├── DropdownMenu (More)     與 NavRail 同選單（Settings / Help / Sign out），tooltip side="bottom"
+    └── Avatar (ME)             我的頭像（最右）
+```
+
+- `grid-cols-[1fr_auto_1fr]` 讓 search input 永遠在視窗正中間，不受左右內容寬度影響；input 寬 `min(480px, 40vw)`。
+- Search input 是 SearchModal 的 trigger（對齊 Teams / Slack top-bar search）——本身不做 inline 過濾，點擊即開 universal search。
+- NavRail 的 Home / Chats tab 與未讀 badge 不搬移（此 prototype 只有 chat 一個 surface）。
 
 ---
 
@@ -173,6 +205,7 @@ Conversation
 | `StatusDot` | 在線狀態圓點：online=綠實心 / busy=紅實心 / away=黃+Clock / offline=灰空心 |
 | `PersonAvatar` | DS Avatar + 自訂 StatusDot overlay |
 | `GroupAvatar` | 群組頭像 |
+| `TeamsAvatar` | Teams 匯入聊天室頭像（`TEAMS_BRAND` #5B5FC7 圓底 + 白色 Teams logo 線條）|
 | `MutedAvatar` | 靜音狀態頭像（白底 + 灰 BellOff）|
 | `makeProfileCard` | 產生 hover 用的 ProfileCard |
 | `MsgStatusIcon` | 訊息狀態 icon（sending / sent / read），在泡泡外 |
@@ -188,10 +221,14 @@ type MsgStatus = 'sending' | 'sent' | 'read'
 type Person  = { name; color; status: Presence; role; email; avatar }
 type Reaction = { emoji; count }
 type Message = { id; author; text; time; status: MsgStatus; reactions[]; replies; threadMessages[]; images?: string[]; date?: string }
-type Room    = { id; name; type; section: 'favorites' | 'chats'; unread; messages[] }
+type Room    = { id; name; type; origin?: 'teams'; section: 'favorites' | 'chats'; unread; messages[] }
 ```
 
+`Room.origin === 'teams'`（2026-07-06 new）：Microsoft Teams migrated 進來的聊天室。**一律歸類為 general chatroom —— 連 Teams 1:1 DM 也轉換成 general group chatroom**（title = 對方名字、`memberKeys` 1 人），因此 `origin:'teams'` 永遠搭配 `type:'general'`。Avatar 判斷優先序 **muted > teams > dm > group**（4 個判斷點：RoomRow / ConversationHeader / MessagePreviewHeader / SearchModal chatroom tab）。
+
 Inline image（`message.images`）用 `UNSPLASH(id)` helper 產生 `images.unsplash.com` 直連圖片 URL（允許 hotlink、穩定，用 `?w=480&h=300&fit=crop` 控制尺寸）。之前用 `picsum.photos` 會因 ad-blocker/firewall/403 host_not_allowed 而變破圖。
+
+Teams 匯入 demo 資料（2026-07-06 new）：`TEAMS_MIGRATED_PEOPLE`（2 位，註冊進 PEOPLE map）+ `TEAMS_MIGRATED_ROOMS`（4 間：favorites 1 + chats 3，含 2 間「Teams DM 轉 general group」範例）。**只在 `config.includeTeamsRooms` 時由 `withTeamsRooms()` 注入**（favorites 排在既有最愛後、chats 穿插在既有列表前段），base story 完全不受影響。`TeamsAvatar`：圓形底色 = Teams 品牌色 `TEAMS_BRAND = '#5B5FC7'`（source: microsoft/fluentui `packages/tokens/src/global/brandColors.ts` `brandTeams[80]`），白色 Teams logo 線條 SVG（rounded-square「T」+ 人形剪影簡化單色版），icon 佔 avatar 62%。
 
 假資料常數：`PEOPLE`（柯南角色）· `ME` · `INITIAL_ROOMS`（含長訊息 + inline image 範例 + `semi-sales`「IT Sales - Table格式範例」chatroom 的 table 範例：少欄少列 forecast/utilization(hug 範例) + 30 欄 22 列 wafer starts 大表(達 max-h 320px 觸發 hover scrollbar + 水平捲動範例)）· `COMMON_EMOJI`。
 App 以 `useState(INITIAL_ROOMS)` 管理 rooms，`handleSend` 在 active room 尾端 append 新訊息。
