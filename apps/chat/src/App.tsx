@@ -2568,6 +2568,12 @@ export type ChatVariantConfig = {
    * - 'suffix' = 一般 GroupAvatar + 房名後綴「[Teams]」(origin 標記移除,標示全靠文字後綴)
    */
   teamsRoomMarker?: 'avatar' | 'suffix'
+  /**
+   * UT 用:把 Teams 匯入房排到「同名原生 room」正下方(id `teams-<x>` ↔ `<x>`),
+   * 讓同名的兩間聊天室在列表中相鄰、方便觀察比較。預設 false(不影響本體 prototype 排序)。
+   * 僅作用於 chats section 內同組的房;check 依 room id 判定不受排序影響。
+   */
+  adjacentTeamsNamesake?: boolean
 }
 
 // 依 seed 做穩定洗牌(各版本不同 seed → 不同排序,但同版本每次一致)。
@@ -2595,12 +2601,32 @@ function withTeamsRooms(rooms: Room[], marker: 'avatar' | 'suffix' = 'avatar'): 
   const tChats = teamsRooms.filter((r) => r.section !== 'favorites')
   return [...favs, ...tFavs, ...chats.slice(0, 2), ...tChats, ...chats.slice(2)]
 }
+// 把 Teams 匯入房(id `teams-<x>`)排到同名原生 room(id `<x>`)正下方,讓同名兩間相鄰。
+// 只在兩者同屬一個陣列(同 section)時生效;找不到同名原生房的 Teams 房維持原位。
+function groupNamesakeTeams(list: Room[]): Room[] {
+  const teamsByNative = new Map<string, Room>()
+  for (const r of list) {
+    const m = /^teams-(.+)$/.exec(r.id)
+    if (m && list.some((x) => x.id === m[1])) teamsByNative.set(m[1], r)
+  }
+  if (teamsByNative.size === 0) return list
+  const pulled = new Set(teamsByNative.values())
+  const out: Room[] = []
+  for (const r of list) {
+    if (pulled.has(r)) continue // 稍後插在同名原生房下方
+    out.push(r)
+    const t = teamsByNative.get(r.id)
+    if (t) out.push(t)
+  }
+  return out
+}
 // 依 roomOrderSeed 重排 rooms(favorites / chats 各自打散,保留分組)。未給 seed → 原序。
-function orderedRooms(seed?: number, includeTeams?: boolean, teamsMarker?: 'avatar' | 'suffix'): Room[] {
+function orderedRooms(seed?: number, includeTeams?: boolean, teamsMarker?: 'avatar' | 'suffix', adjacentNamesake?: boolean): Room[] {
   const base = includeTeams ? withTeamsRooms(INITIAL_ROOMS, teamsMarker) : INITIAL_ROOMS
   if (seed == null) return base
   const favs = seededShuffle(base.filter((r) => r.section === 'favorites'), seed)
-  const chats = seededShuffle(base.filter((r) => r.section !== 'favorites'), (seed ^ 0x9e3779b9) >>> 0)
+  let chats = seededShuffle(base.filter((r) => r.section !== 'favorites'), (seed ^ 0x9e3779b9) >>> 0)
+  if (adjacentNamesake) chats = groupNamesakeTeams(chats)
   return [...favs, ...chats]
 }
 
@@ -2621,8 +2647,8 @@ export default function App({
   config,
   onAction,
 }: { config?: ChatVariantConfig; onAction?: (a: ChatAction) => void } = {}) {
-  const [rooms, setRooms] = useState<Room[]>(() => orderedRooms(config?.roomOrderSeed, config?.includeTeamsRooms, config?.teamsRoomMarker))
-  const [activeId, setActiveId] = useState<string>(() => orderedRooms(config?.roomOrderSeed, config?.includeTeamsRooms, config?.teamsRoomMarker)[0].id)
+  const [rooms, setRooms] = useState<Room[]>(() => orderedRooms(config?.roomOrderSeed, config?.includeTeamsRooms, config?.teamsRoomMarker, config?.adjacentTeamsNamesake))
+  const [activeId, setActiveId] = useState<string>(() => orderedRooms(config?.roomOrderSeed, config?.includeTeamsRooms, config?.teamsRoomMarker, config?.adjacentTeamsNamesake)[0].id)
   const [listOpen, setListOpen] = useState(config?.initialListOpen ?? true)
   const [listWidth, setListWidth] = useState(320)
   const [showPreview, setShowPreview] = useState(config?.initialShowPreview ?? true)
@@ -2630,7 +2656,7 @@ export default function App({
   const [mutedIds, setMutedIds] = useState<Set<string>>(new Set())
   const [fullWidth, setFullWidth] = useState(config?.initialFullWidth ?? true)
   const [favOrder, setFavOrder] = useState<string[]>(
-    () => orderedRooms(config?.roomOrderSeed, config?.includeTeamsRooms, config?.teamsRoomMarker).filter((r) => r.section === 'favorites').map((r) => r.id)
+    () => orderedRooms(config?.roomOrderSeed, config?.includeTeamsRooms, config?.teamsRoomMarker, config?.adjacentTeamsNamesake).filter((r) => r.section === 'favorites').map((r) => r.id)
   )
   // The "Last read" divider only shows for the room/message captured at the
   // moment an unread room is opened, and is cleared the instant the user

@@ -5,11 +5,11 @@ import { utSubmit } from './utSubmit'
 
 // ── UT 專案定義:Teams 匯入聊天室標示辨識度 ─────────────────────────────────────
 // 受測 prototype = Teams 整合預設(chrome='top-search' + includeTeamsRooms)。
-// 驗證:使用者能否分辨哪些聊天室是從 Microsoft Teams 搬遷過來的(含同名 DM /
-// Teams 房不混淆),並比較兩種標示方式的辨識度:
+// 驗證:使用者能否分辨哪些聊天室是從 Microsoft Teams 搬遷過來的,並比較兩種標示方式的辨識度:
 //   A = Teams 品牌色頭像標示(現行設計,teamsRoomMarker: 'avatar')
 //   B = 一般群組頭像 + 房名後綴「[Teams]」(teamsRoomMarker: 'suffix',僅存在於本測試,
 //       不影響本體 prototype — config 驅動,預設值仍為 'avatar')
+// 無密碼閘;adjacentTeamsNamesake 讓同名的原生 DM 與 Teams 房在列表相鄰,方便觀察比較。
 const seqQuestion = {
   id: 'seq',
   questionType: 'singleEase' as const,
@@ -28,8 +28,8 @@ const teamsMarkerProject: UTProject<ChatAction> = {
   id: 'teams-room-marker',
   title: 'UT – Teams Migrated Room Marker',
   goal: {
-    zh: '驗證使用者能否分辨哪些聊天室是從 Microsoft Teams 搬遷過來的(包含同名 DM 與 Teams 房不混淆),並比較「品牌色頭像」與「房名後綴 [Teams]」兩種標示方式的辨識度。',
-    en: 'Verify whether users can tell which chatrooms were migrated from Microsoft Teams (including not confusing same-named DMs and Teams rooms), and compare two marker designs: brand-color avatar vs. a "[Teams]" name suffix.',
+    zh: '驗證使用者能否分辨哪些聊天室是從 Microsoft Teams 搬遷過來的,並比較「品牌色頭像」與「房名後綴 [Teams]」兩種標示方式的辨識度。',
+    en: 'Verify whether users can tell which chatrooms were migrated from Microsoft Teams, and compare two marker designs: brand-color avatar vs. a "[Teams]" name suffix.',
   },
   instructions: [
     { zh: '這是一次易用性測試,我們測的是介面、不是你 — 沒有對錯,依直覺操作即可。', en: "This is a usability test — we're testing the interface, not you. There are no right answers; just go with your instincts." },
@@ -46,18 +46,17 @@ const teamsMarkerProject: UTProject<ChatAction> = {
   tasks: [
     {
       id: 't1',
-      title: { zh: '用頂部搜尋找到「灰原哀」,並開啟與她的「1 對 1 私訊(DM)」。', en: "Use the top search bar to find 'Haibara Ai' and open your 1-on-1 direct message (DM) with her." },
-      hint: { zh: '小心:列表裡有不只一個同名的聊天室。', en: 'Careful: more than one chat shares this name.' },
+      title: { zh: '用頂部搜尋,找到並開啟你與「灰原哀」在 Microsoft Teams 時期的 1 對 1 私訊(DM)紀錄。', en: "Use the top search bar to find and open your 1-on-1 direct message (DM) history with 'Haibara Ai' from your Microsoft Teams days." },
       check: (acts) => {
-        if (acts.some((a) => a.type === 'open-room' && a.roomId === 'ai')) return { ok: true }
-        if (acts.some((a) => a.type === 'open-room' && a.roomId === 'teams-ai')) {
-          return { ok: false, reason: { zh: '開到的是從 Teams 匯入的同名「群組」聊天室,不是 1 對 1 DM(同名房混淆)', en: 'Opened the same-named Teams-migrated GROUP chat, not the 1-on-1 DM (same-name confusion)' } }
+        if (acts.some((a) => a.type === 'open-room' && a.roomId === 'teams-ai')) return { ok: true }
+        if (acts.some((a) => a.type === 'open-room' && a.roomId === 'ai')) {
+          return { ok: false, reason: { zh: '開到的是本 app 原生的私訊,不是從 Teams 搬遷過來的那筆紀錄', en: "Opened this app's native DM, not the record migrated from Teams" } }
         }
-        return { ok: false, reason: { zh: '未開啟與灰原哀的 1 對 1 DM', en: 'Did not open the 1-on-1 DM with Haibara Ai' } }
+        return { ok: false, reason: { zh: '未開啟與灰原哀從 Teams 搬遷過來的私訊紀錄', en: 'Did not open the Teams-migrated DM record with Haibara Ai' } }
       },
       postTask: [
         seqQuestion,
-        { id: 't1-tell', questionType: 'writtenResponse', prompt: { zh: '搜尋結果裡出現了同名的項目,你是怎麼分辨哪個才是 1 對 1 私訊的?', en: 'The results contained same-named items — how did you tell which one was the 1-on-1 DM?' }, required: false },
+        { id: 't1-tell', questionType: 'writtenResponse', prompt: { zh: '你是怎麼找到並確認那筆是「從 Teams 搬過來」的私訊紀錄的?', en: 'How did you find and confirm that this was the DM record migrated "from Teams"?' }, required: false },
       ],
     },
     {
@@ -73,25 +72,16 @@ const teamsMarkerProject: UTProject<ChatAction> = {
         { id: 't2-tell', questionType: 'writtenResponse', prompt: { zh: '你是怎麼判斷哪些聊天室是從 Teams 搬過來的?', en: 'How did you tell which chatrooms came from Teams?' }, required: false },
       ],
     },
-    {
-      id: 't3',
-      title: { zh: '用頂部搜尋找到內容提到「migration」的訊息,並用「View message」跳轉到該則訊息。', en: "Use the top search bar to find a message that mentions 'migration', then jump to it with 'View message'." },
-      hint: { zh: '輸入關鍵字後切到 Message 分頁,點某則結果會先出現預覽。', en: "Type the keyword, switch to the Message tab; clicking a result opens a preview first." },
-      check: (acts) =>
-        acts.some((a) => a.type === 'search-view-message' && (a.messageId === 'to2' || a.messageId === 'tsh1'))
-          ? { ok: true }
-          : { ok: false, reason: { zh: '未透過搜尋的「View message」跳轉到提到 migration 的訊息', en: "Did not jump to a message mentioning 'migration' via search's 'View message'" } },
-    },
   ],
   variants: {
     // roomOrderSeed 各版不同 → 列表排序各異,受測者無法靠記憶位置作答;check 依 room id 判定不受影響。
     A: chatVariant(
       { zh: '版本 A:Teams 品牌色頭像標示', en: 'Version A: Teams brand-color avatar marker' },
-      { chrome: 'top-search', includeTeamsRooms: true, initialShowPreview: false, teamsRoomMarker: 'avatar', roomOrderSeed: 11 },
+      { chrome: 'top-search', includeTeamsRooms: true, initialShowPreview: false, teamsRoomMarker: 'avatar', adjacentTeamsNamesake: true, roomOrderSeed: 11 },
     ),
     B: chatVariant(
       { zh: '版本 B:一般群組頭像 + 房名後綴 [Teams]', en: 'Version B: regular group avatar + "[Teams]" name suffix' },
-      { chrome: 'top-search', includeTeamsRooms: true, initialShowPreview: false, teamsRoomMarker: 'suffix', roomOrderSeed: 22 },
+      { chrome: 'top-search', includeTeamsRooms: true, initialShowPreview: false, teamsRoomMarker: 'suffix', adjacentTeamsNamesake: true, roomOrderSeed: 22 },
     ),
   },
 }
@@ -111,19 +101,19 @@ type Story = StoryObj<typeof UsabilityTest>
 // record:錄製畫面+講話聲,摘要頁自動下載 webm + Excel。預設中文,測試說明頁可切 English。
 export const CombinedAB: Story = {
   name: '綜合測試 A→B(含結論)',
-  render: () => <UsabilityTestAB project={teamsMarkerProject} order={['A', 'B']} password="0000" record estimatedMinutes={10} submit={utSubmit} />,
+  render: () => <UsabilityTestAB project={teamsMarkerProject} order={['A', 'B']} record estimatedMinutes={10} submit={utSubmit} />,
 }
 export const CombinedBA: Story = {
   name: '綜合測試 B→A(counterbalance)',
-  render: () => <UsabilityTestAB project={teamsMarkerProject} order={['B', 'A']} password="0000" record estimatedMinutes={10} submit={utSubmit} />,
+  render: () => <UsabilityTestAB project={teamsMarkerProject} order={['B', 'A']} record estimatedMinutes={10} submit={utSubmit} />,
 }
 
 // 單獨跑某一版(需要時用)。
 export const VersionA: Story = {
   name: '只測版本 A — 品牌色頭像標示',
-  render: () => <UsabilityTest project={teamsMarkerProject} variant="A" password="0000" estimatedMinutes={10} submit={utSubmit} />,
+  render: () => <UsabilityTest project={teamsMarkerProject} variant="A" estimatedMinutes={10} submit={utSubmit} />,
 }
 export const VersionB: Story = {
   name: '只測版本 B — 房名後綴 [Teams]',
-  render: () => <UsabilityTest project={teamsMarkerProject} variant="B" password="0000" estimatedMinutes={10} submit={utSubmit} />,
+  render: () => <UsabilityTest project={teamsMarkerProject} variant="B" estimatedMinutes={10} submit={utSubmit} />,
 }
