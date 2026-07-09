@@ -6,9 +6,9 @@ import App from './App'
 // Microsoft Teams 風格的 Rich editor 輸入功能(RichTextEditor.tsx):
 // - 三處輸入框都有 Rich editor(Type icon)toggle:主輸入框 / Thread panel
 //   輸入框 / chat bubble hover → More → Edit 的編輯狀態輸入框
-// - Toggle ON → format toolbar(對齊 Teams):Bold / Italic / Underline /
-//   Strikethrough │ Bulleted list / Numbered list │ Text highlight color /
-//   Font color / Font size │ Insert link / More(Quote / Code snippet /
+// - Toggle ON → format toolbar(對齊 Teams,2026-07-09 v3 順序):Bold / Italic /
+//   Underline / Strikethrough │ Text highlight color / Font color / Font size │
+//   Bulleted list / Numbered list │ Insert link / More(Quote / Code snippet /
 //   Horizontal rule / Clear all formatting)
 // - Enter 規則(2026-07-09):Enter 直接送出(list 內 = 換 item)、Shift+Enter 換行
 // - 鍵盤清單捷徑:「-」/「*」+空白 → bulleted list;「1.」+空白 → numbered list

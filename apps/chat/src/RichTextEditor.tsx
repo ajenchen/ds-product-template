@@ -8,9 +8,9 @@
 // - Active state:!bg-neutral-selected(對齊 App.tsx NavBtn active pattern)
 // - Tokens:--color-neutral-* / --color-primary
 //
-// 工具列按鈕順序(2026-07-09 user 指定,對齊 Microsoft Teams format toolbar):
-// Bold / Italic / Underline / Strikethrough │ Bulleted list / Numbered list │
-// Text highlight color / Font color / Font size │ Insert link / More
+// 工具列按鈕順序(2026-07-09 v3 user 指定,對齊 Microsoft Teams format toolbar):
+// Bold / Italic / Underline / Strikethrough │ Text highlight color / Font color /
+// Font size │ Bulleted list / Numbered list │ Insert link / More
 // 色盤 = Office/Teams highlight 標準 15 色 + None(Teams 繼承 Office palette);
 // Font size = Teams 新版 client 的 Small / Medium / Large 三檔。
 // 編輯引擎 = document.execCommand(prototype 級,Teams 同為 contentEditable 架構)。
@@ -554,9 +554,21 @@ export function FormatToolbar({ editorRef }: { editorRef: React.RefObject<RichEd
     if (!el) return
     el.focus()
     const sel = window.getSelection()
-    if (sel && savedRange.current && el.contains(savedRange.current.commonAncestorContainer)) {
+    if (!sel) return
+    if (savedRange.current && el.contains(savedRange.current.commonAncestorContainer)) {
       sel.removeAllRanges()
       sel.addRange(savedRange.current)
+    } else {
+      // savedRange 從未建立或已失效(送出後 clear() 清空 innerHTML,range 指向
+      // detached node)→ 重建 caret 到內容最尾。沒有這個 fallback,程式化 focus()
+      // 不保證產生 selection,execCommand('insertHTML') 會靜默失敗
+      // (2026-07-09 user 回報「insert link 之後沒有出現 link」的 root cause)。
+      savedRange.current = null
+      const r = document.createRange()
+      r.selectNodeContents(el)
+      r.collapse(false)
+      sel.removeAllRanges()
+      sel.addRange(r)
     }
   }, [editorRef])
 
@@ -577,9 +589,6 @@ export function FormatToolbar({ editorRef }: { editorRef: React.RefObject<RichEd
         <ToolBtn icon={Italic} label="Italic" active={active.italic} onClick={() => exec('italic')} />
         <ToolBtn icon={Underline} label="Underline" active={active.underline} onClick={() => exec('underline')} />
         <ToolBtn icon={Strikethrough} label="Strikethrough" active={active.strikeThrough} onClick={() => exec('strikeThrough')} />
-        <Separator orientation="vertical" className="mx-1 h-5" />
-        <ToolBtn icon={List} label="Bulleted list" active={active.insertUnorderedList} onClick={() => exec('insertUnorderedList')} />
-        <ToolBtn icon={ListOrdered} label="Numbered list" active={active.insertOrderedList} onClick={() => exec('insertOrderedList')} />
         <Separator orientation="vertical" className="mx-1 h-5" />
         <ColorSwatchPopover
           icon={Highlighter}
@@ -615,6 +624,9 @@ export function FormatToolbar({ editorRef }: { editorRef: React.RefObject<RichEd
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
+        <Separator orientation="vertical" className="mx-1 h-5" />
+        <ToolBtn icon={List} label="Bulleted list" active={active.insertUnorderedList} onClick={() => exec('insertUnorderedList')} />
+        <ToolBtn icon={ListOrdered} label="Numbered list" active={active.insertOrderedList} onClick={() => exec('insertOrderedList')} />
         <Separator orientation="vertical" className="mx-1 h-5" />
         <ToolBtn
           icon={LinkIcon}
@@ -653,7 +665,10 @@ export function FormatToolbar({ editorRef }: { editorRef: React.RefObject<RichEd
         onCloseFocus={restoreSelection}
         onConfirm={(text, url) => {
           const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
-          exec('insertHTML', `<a href="${esc(ensureProtocol(url))}" target="_blank" rel="noreferrer">${esc(text)}</a>`)
+          const html = `<a href="${esc(ensureProtocol(url))}" target="_blank" rel="noreferrer">${esc(text)}</a>`
+          // 延後到 dialog 關閉、onCloseAutoFocus 把焦點還給編輯區之後才插入 —
+          // dialog 還開著時 Radix focus trap 會跟編輯區搶焦點,insertHTML 可能落空
+          setTimeout(() => exec('insertHTML', html), 0)
         }}
       />
     </>
