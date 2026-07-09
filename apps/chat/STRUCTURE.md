@@ -1,6 +1,6 @@
 # TeaChat Chat Prototype — 結構文件
 
-單一檔案 prototype：`apps/chat/src/App.tsx`（約 2600 行）。本文件記錄元件樹、命名與職責，方便 onboarding 與對照修改。
+單一檔案 prototype：`apps/chat/src/App.tsx`（約 3000 行）+ `apps/chat/src/RichTextEditor.tsx`（Teams 風格 rich text 編輯工具列，2026-07-09 抽出共用）。本文件記錄元件樹、命名與職責，方便 onboarding 與對照修改。
 
 > 消費 `@qijenchen/design-system`（public surface only）。詳見 repo 根目錄 `CLAUDE.md`。
 
@@ -21,6 +21,8 @@ App  (export default)
     └── Conversation            右側主區（對話 + Thread panel）
     └── SettingsModal           overlay，由 NavRail more → Settings 開啟
 ```
+
+Storybook stories（Chat folder）：`Apps/chat/Chat`（`Chat.stories.tsx`，base）/ `Apps/chat/Teams Integration`（`TeamsChat.stories.tsx`）/ `Apps/chat/TeaChat Desktop version`（`TeaChatDesktop.stories.tsx`，2026-07-09 new — 獨立 prototype，桌面版 3-column 基底,重點展示 Teams 風格 Rich editor,見「Rich editor」callout）。
 
 `config.chrome === 'top-search'`（Teams 整合 prototype，story `Apps/chat/Teams Integration`，檔案 `TeamsChat.stories.tsx`；story config 另帶 `initialShowPreview: false` — chat message preview 預設 OFF，2026-07-06 user 指定）時改為：
 
@@ -168,12 +170,22 @@ Conversation
 │       ├── ReactionBar (z-[8]；hover 顯示；hideReplyInThread 時不顯示 Reply in thread 按鈕)
 │       ├── ReactionMoreMenu  (mine vs other 不同選單；`side="bottom" sideOffset={8}`，保留 Radix 碰撞避讓)
 │       └── Thread replies link: shrink-0 L-connector 24×12（border-l/b 1px neutral-4 + rounded-bl-[8px] 圓角，橫線落在 24×24 視覺垂直中點 y=12）+ MessagesSquare 16 + "N replies" sm/500 + 最新回覆時間 sm/400 neutral-7；icon 與 "N replies" 文字顏色皆為 `var(--color-primary)`（= primary-6，2026-06-18 confirmed）；最新回覆時間維持 neutral-7
-├── InputBox                  (接受 `fullWidth` + `onSend` prop。左右外側距欄位邊緣 56px；OFF=max 880px 置中，視窗窄於 880px 時仍保持 56px。單行：textarea + buttons 同排；多行：textarea 全寬在上，buttons 獨立在下。外框 padding top/bottom 6px / left 12px / right 8px；整個輸入方塊 max-height 280px（textarea clamp 232）；圓角 rounded-lg(8px)；輸入後外框轉 primary-hover 藍框；按鈕一律 24×24(`!h-6 !w-6 !min-w-0 !p-0`)，按鈕間距 8px(`gap-2`，同套用於 ThreadInputBox)；Send 按鈕無值時 text variant(無底深線)、有值時 primary。外層 pt-2=8px / pb-4=16px)
+├── InputBox                  (接受 `fullWidth` + `onSend(text, html?)` prop。左右外側距欄位邊緣 56px；OFF=max 880px 置中，視窗窄於 880px 時仍保持 56px。單行：textarea + buttons 同排；多行：textarea 全寬在上，buttons 獨立在下。外框 padding top/bottom 6px / left 12px / right 8px；整個輸入方塊 max-height 280px（textarea clamp 232）；圓角 rounded-lg(8px)；輸入後外框轉 primary-hover 藍框；按鈕一律 24×24(`!h-6 !w-6 !min-w-0 !p-0`)，按鈕間距 8px(`gap-2`，同套用於 ThreadInputBox)；Send 按鈕無值時 text variant(無底深線)、有值時 primary。外層 pt-2=8px / pb-4=16px。**Rich editor toggle**（Type 按鈕，ON=`!bg-neutral-selected`）→ 見下方「Rich editor」callout)
 └── ThreadPanel               寬 320~720，可拉寬（ResizeHandle line 1px neutral-4）
     ├── 父訊息（MessageBubble isInThread，下方無 "N replies" 分隔線）+ 回覆訊息（MessageBubble isInThread，ReactionBar 無 Reply in thread）
     ├── `Message.threadMessages?: Message[]` 存實際回覆內容；replies count/latestReplyTime 由此衍生
-    └── ThreadInputBox        含 "Also send to chatroom" checkbox；圓角 rounded-lg(8px)；Send 按鈕 24×24 + 無值 text / 有值 primary（與主 InputBox 同規則）（ThreadPanel 容器無 `border-l`，視覺分隔線由 ResizeHandle 1px line 提供）；**可發送**（Enter 或 Send 鈕，`onSend(text, alsoSend)` 上拋至 App `handleThreadSend`）
+    └── ThreadInputBox        含 "Also send to chatroom" checkbox；圓角 rounded-lg(8px)；Send 按鈕 24×24 + 無值 text / 有值 primary（與主 InputBox 同規則）（ThreadPanel 容器無 `border-l`，視覺分隔線由 ResizeHandle 1px line 提供）；**可發送**（Enter 或 Send 鈕，`onSend(text, alsoSend, html?)` 上拋至 App `handleThreadSend`）；**Rich editor toggle**（checkbox 與 Send 之間，同主 InputBox 行為）
 ```
+
+> **Rich editor（2026-07-09 new，Microsoft Teams format toolbar 對齊）**：SSOT = `apps/chat/src/RichTextEditor.tsx`（`FormatToolbar` + `RichTextArea` + `RichEditorHandle` + `textToHtml`）+ `apps/chat/src/rich-text.css`（元件直接 import — Storybook preview 走 `.storybook/storybook.css` 不載 app globals.css，樣式必須跟著元件走）。
+> - **三處輸入框共用**（2026-07-09 user 指定）：主 InputBox / ThreadInputBox / chat bubble 編輯狀態（`EditMessageComposer`）。點「Rich editor」（Type icon）toggle → format toolbar 浮出（置頂 + `border-b border-divider` 分隔），再點收合；兩模式互轉保留已輸入內容（plain→`textToHtml` escape；rich→`getText()`）。
+> - **Toolbar 按鈕順序**（user 指定，對齊 Teams）：Bold / Italic / Underline / Strikethrough │ Bulleted list / Numbered list │ Text highlight color / Font color / Font size │ Insert link / More。按鈕 28×28（`!h-7 !w-7`）、active=`!bg-neutral-selected` + `aria-pressed`；直接格式按鈕 `onMouseDown preventDefault` 保住編輯區 selection。
+> - **色盤**：highlight = Office/Teams 標準 15 色 + None（清除底色）；font color = Teams 風 15 色。Popover 5 欄 swatch grid（20×20 格 + hover ring primary）。**Font size** = Teams 新版三檔 Small(12px)/Medium(14px)/Large(18px)（execCommand fontSize 2/3/5），DropdownMenu 內選項以各自字級渲染 + Check 標記。**More menu**：Quote（blockquote）/ Code snippet（pre）/ Insert horizontal rule / Clear all formatting。
+> - **Insert link**：DS Dialog（`autoHeight` + `maxWidth=448`），Text to display + Address 兩欄（Teams 同款）；無 protocol 自動補 `https://`；`onCloseAutoFocus` 改為聚焦回編輯區（Radix 預設 focus 回 trigger、只 preventDefault 會掉到 body，Ctrl+Enter 送出捷徑會失效）。
+> - **編輯引擎**：contentEditable + `document.execCommand`（prototype 級）。selection 由 `selectionchange` listener 存 `savedRange`（popover/dialog 失焦後可還原）；active states 用 `queryCommandState`。placeholder 由 JS 同步 `data-empty` attribute 驅動（contentEditable 常駐 `<br>` 導致 `:empty` 不可靠）；`.rich-input` min-height 21px（空內容會塌成 0 高 → 送出清空後輸入區消失,2026-07-09 verify 抓到）。
+> - **Enter 行為**（Teams format 模式）：rich ON → Enter 換行、**Ctrl/Cmd+Enter 或 Send 鈕送出**；rich OFF → 原 Enter 送出不變。送出後 rich 模式保持開啟（Teams 同,toolbar 常駐直到手動收合）。
+> - **Message model**：`Message.html?: string`（rich 送出時存 HTML,bubble 以 `.rich-text` 樣式 `dangerouslySetInnerHTML` 渲染；`text` 仍存純文字供列表 preview / 搜尋）+ `Message.edited?: boolean`（bubble 時間戳旁顯示「Edited」,對齊 Teams）。
+> - **Bubble 編輯狀態**：自己的訊息 hover → ReactionMoreMenu 首項 **Edit**（Pencil）→ bubble 原位換成 `EditMessageComposer`（w-full 撐滿可用寬,對齊 Teams edit box；外框 primary-hover 藍框）：prefill `message.html ?? textToHtml(text)`、Rich editor toggle（開=toolbar 浮出）、底部 ✕ 取消 / ✓ 儲存（有值 primary）；Enter 儲存（rich ON 時換行）、Escape 取消。存檔走 `App.handleEditMessage(messageId, {text, html})` — 同步搜尋 active room 的 `messages` 與各 `threadMessages`（main 區與 thread panel 內都可編輯）,標 `edited: true`。search preview（readOnly）無 ReactionBar → 無編輯入口。
 
 > **Chat bubble 時間顯示（2026-07-06 confirmed，AM/PM 制）**：所有 chat bubble 內時間一律經 `formatBubbleTime(m, now)` 顯示（我方 / 對方 / thread panel / thread reply link「最新回覆時間」共 5 處）。規則：今天 `hh:mm AM/PM`（如 `9:18 AM`）· 昨天 `Yesterday hh:mm AM/PM` · 本週其他天（同一 ISO 週，排除今昨）`Monday hh:mm AM/PM` · 今年較早 `mm/dd hh:mm AM/PM`（`05/28 3:20 PM`）· 非今年 `yyyy/mm/dd hh:mm AM/PM`（`2025/05/26 6:10 PM`）。時間點由 `msgDateTime` = `message.date`（缺→今天）+ `message.time`（正規化為 HH:MM 24h）組成；`fmtHM12` 轉 12 小時 AM/PM。ChatList RoomRow 與搜尋結果的時間走 `formatListTime`（簡短版：今天顯示時間、其餘顯示相對日期/星期，對齊 Teams/Slack 列表慣例）。所有 demo `message.time` 已正規化為 HH:MM（原 `'5/28'` 之類日期字串改為實際時分 + 補完整 `date`）。
 

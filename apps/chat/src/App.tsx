@@ -74,6 +74,7 @@ import {
   Trash2,
   ChevronRight as SubArrow,
 } from 'lucide-react'
+import { FormatToolbar, RichTextArea, textToHtml, type RichEditorHandle } from './RichTextEditor'
 
 // ── Shared button primitives ──────────────────────────────────────────────────
 function NavBtn({
@@ -175,6 +176,11 @@ type Message = {
   id: string
   author: 'me' | string
   text: string
+  // Rich editor(Teams 風格 format toolbar)送出的 HTML 內容;有值時 bubble 以
+  // rich-text 樣式渲染 html,text 仍存純文字(供列表 preview / 搜尋用)。
+  html?: string
+  // 訊息被編輯過(bubble 時間戳旁顯示「Edited」,對齊 Teams)。
+  edited?: boolean
   time: string
   reactions?: Reaction[]
   replies?: number
@@ -1395,9 +1401,12 @@ function MsgStatusIcon({ status }: { status: MsgStatus }) {
 function ReactionMoreMenu({
   mine,
   room,
+  onEdit,
 }: {
   mine: boolean
   room: Room
+  // 自己的訊息 → Edit 選項(bubble 進入編輯狀態,對齊 Teams hover → More → Edit)
+  onEdit?: () => void
 }) {
   // Derive member count and read members for "Read by" (prototype: all non-me members read)
   const memberCount = room.type === 'general'
@@ -1417,6 +1426,7 @@ function ReactionMoreMenu({
       <DropdownMenuContent align="end" side="bottom" sideOffset={8}>
         {mine ? (
           <>
+            <DropdownMenuItem startIcon={Pencil} onSelect={onEdit}>Edit</DropdownMenuItem>
             <DropdownMenuItem startIcon={Reply}>Reply with quote</DropdownMenuItem>
             <DropdownMenuItem startIcon={Copy}>Copy</DropdownMenuItem>
             <DropdownMenuItem startIcon={Pin}>Pin</DropdownMenuItem>
@@ -1447,7 +1457,7 @@ function ReactionMoreMenu({
   )
 }
 
-function ReactionBar({ onOpenThread, mine, room, hideReplyInThread }: { onOpenThread: () => void; mine: boolean; room: Room; hideReplyInThread?: boolean }) {
+function ReactionBar({ onOpenThread, mine, room, hideReplyInThread, onEdit }: { onOpenThread: () => void; mine: boolean; room: Room; hideReplyInThread?: boolean; onEdit?: () => void }) {
   return (
     <div className="absolute -top-4 right-2 z-[8] flex items-center gap-0.5 rounded-lg border border-divider bg-surface-raised p-0.5 shadow-md invisible group-hover/msg:visible [&:has([data-state=open])]:visible">
       {COMMON_EMOJI.map((e) => (
@@ -1462,7 +1472,67 @@ function ReactionBar({ onOpenThread, mine, room, hideReplyInThread }: { onOpenTh
       <Separator orientation="vertical" className="mx-0.5 h-5" />
       {!hideReplyInThread && <IconBtnSm icon={MessagesSquare} label="Reply in thread" onClick={onOpenThread} />}
       <IconBtnSm icon={Reply} label="Reply with quote" />
-      <ReactionMoreMenu mine={mine} room={room} />
+      <ReactionMoreMenu mine={mine} room={room} onEdit={onEdit} />
+    </div>
+  )
+}
+
+// ── Edit composer — chat bubble 編輯狀態(Teams:More → Edit 後 bubble 變輸入框)──
+// 底部列:Rich editor toggle(開 = 上方浮出 format toolbar)+ 右側 ✓ 儲存 / ✕ 取消。
+// Enter 儲存、Shift+Enter 換行、Escape 取消(對齊 Teams edit box 行為)。
+function EditMessageComposer({
+  message,
+  onSave,
+  onCancel,
+}: {
+  message: Message
+  onSave: (payload: { text: string; html: string }) => void
+  onCancel: () => void
+}) {
+  const editorRef = useRef<RichEditorHandle>(null)
+  const [rich, setRich] = useState(false)
+  const [hasValue, setHasValue] = useState(true)
+
+  function save() {
+    const ed = editorRef.current
+    if (!ed || ed.isEmpty()) return
+    onSave({ text: ed.getText().trim(), html: ed.getHTML() })
+  }
+
+  const btn24 = '!h-6 !w-6 !min-w-0 !p-0'
+  return (
+    <div
+      className="w-full rounded-lg border bg-canvas"
+      style={{ paddingTop: 6, paddingBottom: 6, paddingLeft: 12, paddingRight: 8, borderColor: 'var(--color-primary-hover)' }}
+    >
+      {rich && (
+        <div className="mb-1 border-b border-divider pb-1">
+          <FormatToolbar editorRef={editorRef} />
+        </div>
+      )}
+      <RichTextArea
+        ref={editorRef}
+        placeholder="Edit message"
+        ariaLabel="Edit message"
+        initialHTML={message.html ?? textToHtml(message.text)}
+        autoFocus
+        enterMode={rich ? 'newline' : 'send'}
+        onSubmit={save}
+        onEscape={onCancel}
+        onHasContentChange={setHasValue}
+        className="max-h-[232px] overflow-y-auto"
+      />
+      <div className="mt-1.5 flex items-center gap-2">
+        <IconBtnSm icon={Type} label="Rich editor" onClick={() => setRich((v) => !v)} className={`${btn24} ${rich ? '!bg-neutral-selected' : ''}`} />
+        <div className="flex-1" />
+        <IconBtnSm icon={X} label="Cancel" onClick={onCancel} className={btn24} />
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant={hasValue ? 'primary' : 'text'} size="sm" iconOnly startIcon={Check} aria-label="Save edit" title="" onClick={save} className={btn24} />
+          </TooltipTrigger>
+          <TooltipContent>Save</TooltipContent>
+        </Tooltip>
+      </div>
     </div>
   )
 }
@@ -1475,6 +1545,7 @@ function MessageBubble({
   isInThread,
   readOnly,
   flashToken,
+  onEditMessage,
 }: {
   message: Message
   isLastMine: boolean
@@ -1486,8 +1557,11 @@ function MessageBubble({
   // Bumping this (to any truthy, distinct value) re-triggers the one-time indigo-6
   // background flash on this bubble — used when jumping to a message from search.
   flashToken?: number
+  // 自己的訊息 hover → More → Edit:bubble 變編輯狀態(EditMessageComposer,含 rich toolbar)。
+  onEditMessage?: (messageId: string, payload: { text: string; html: string }) => void
 }) {
   const [flashing, setFlashing] = useState(false)
+  const [editing, setEditing] = useState(false)
   useEffect(() => {
     if (!flashToken) return
     setFlashing(true)
@@ -1515,12 +1589,24 @@ function MessageBubble({
   // overflows. min-w-0 lets it shrink below content so the table scrolls inside.
   const bubble = (
     <div id={`msg-${message.id}`} className="relative max-w-full min-w-0" style={isRepliedCopy ? { minWidth: REPLIED_LINK_MIN_W } : undefined}>
-      {!readOnly && <ReactionBar onOpenThread={() => onOpenThread(message)} mine={mine} room={room} hideReplyInThread={isInThread} />}
+      {!readOnly && (
+        <ReactionBar
+          onOpenThread={() => onOpenThread(message)}
+          mine={mine}
+          room={room}
+          hideReplyInThread={isInThread}
+          onEdit={mine && onEditMessage ? () => setEditing(true) : undefined}
+        />
+      )}
       <div
         className={`rounded-xl p-3 text-body max-w-full min-w-0 transition-colors duration-700 ${mine ? 'text-foreground' : 'bg-muted text-foreground'}`}
         style={{ backgroundColor: flashing ? 'var(--color-indigo-6)' : (mine ? '#EBEEFF' : undefined) }}
       >
-        <p className="whitespace-pre-wrap break-words">{message.text}</p>
+        {message.html ? (
+          <div className="rich-text break-words" dangerouslySetInnerHTML={{ __html: message.html }} />
+        ) : (
+          <p className="whitespace-pre-wrap break-words">{message.text}</p>
+        )}
         {message.images && message.images.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-2">
             {message.images.map((src, i) => (
@@ -1601,6 +1687,21 @@ function MessageBubble({
     </div>
   )
 
+  // 編輯狀態 — bubble 原位換成 EditMessageComposer(Teams:hover → More → Edit)。
+  // 編輯中隱藏 thread / replied link,存檔或取消後還原。
+  const editComposer = editing && onEditMessage ? (
+    <EditMessageComposer
+      message={message}
+      onSave={(payload) => { onEditMessage(message.id, payload); setEditing(false) }}
+      onCancel={() => setEditing(false)}
+    />
+  ) : null
+
+  // 「Edited」標記 — 編輯過的訊息時間戳旁顯示(對齊 Teams)
+  const editedTag = message.edited ? (
+    <span style={{ fontSize: 12, fontWeight: 400, lineHeight: '130%', color: 'var(--color-neutral-7)' }}>Edited</span>
+  ) : null
+
   // Thread replies link (main area only)
   const threadLink = !isInThread && replyCount > 0 ? (
     <div className={`mt-0.5 flex items-center gap-1 ${mine ? 'justify-end' : ''}`}>
@@ -1669,18 +1770,20 @@ function MessageBubble({
   )
 
   // ── Thread panel layout (narrow, simpler — no MessageArea margin rules) ──
+  // 編輯中:row + column 撐滿(flex-1 / w-full),edit composer 佔滿面板寬(對齊 Teams)
   if (isInThread) {
     return (
       <div className={`group/msg flex flex-col ${mine ? 'items-end' : 'items-start'}`}>
-        <div className={`flex items-start gap-2 ${mine ? 'flex-row-reverse' : ''} max-w-[85%]`}>
+        <div className={`flex items-start gap-2 ${mine ? 'flex-row-reverse' : ''} ${editComposer ? 'w-full max-w-full' : 'max-w-[85%]'}`}>
           {!mine && author && (
             <div className="mt-0.5 shrink-0">
               <PersonAvatar person={author} size={32} />
             </div>
           )}
-          <div className="flex flex-col gap-1 min-w-0">
+          <div className={`flex flex-col gap-1 min-w-0 ${editComposer ? 'flex-1' : ''}`}>
             {mine && (
-              <div className="flex justify-end pr-1">
+              <div className="flex justify-end gap-2 pr-1">
+                {editedTag}
                 <span style={{ fontSize: 12, fontWeight: 400, lineHeight: '130%', color: 'var(--color-neutral-7)' }}>{formatBubbleTime(message, now)}</span>
               </div>
             )}
@@ -1688,9 +1791,10 @@ function MessageBubble({
               <div className="flex items-center gap-2">
                 <span style={{ fontSize: 12, fontWeight: 400, lineHeight: '130%', color: 'var(--color-neutral-7)' }}>{author.name}</span>
                 <span style={{ fontSize: 12, fontWeight: 400, lineHeight: '130%', color: 'var(--color-neutral-7)' }}>{formatBubbleTime(message, now)}</span>
+                {editedTag}
               </div>
             )}
-            {bubble}
+            {editComposer ?? bubble}
           </div>
         </div>
       </div>
@@ -1709,14 +1813,16 @@ function MessageBubble({
 
   if (mine) {
     // bubble left edge ≥ 96px from region left; status icon right edge 20px from region right
+    // 編輯中:inner row 加 flex-1,edit composer(w-full)撐滿可用寬(對齊 Teams edit box)
     return (
       <div className="group/msg flex w-full justify-end" style={{ paddingLeft: 96, paddingRight: 20 }}>
-        <div className="flex items-end min-w-0">
+        <div className={`flex items-end min-w-0 ${editComposer ? 'flex-1' : ''}`}>
           <div className="flex flex-1 flex-col gap-1 min-w-0 items-end">
-            <div className="flex justify-end pr-1">
+            <div className="flex justify-end gap-2 pr-1">
+              {editedTag}
               <span style={{ fontSize: 12, fontWeight: 400, lineHeight: '130%', color: 'var(--color-neutral-7)' }}>{formatBubbleTime(message, now)}</span>
             </div>
-            {bubbleBlock}
+            {editComposer ?? bubbleBlock}
           </div>
           {statusCol}
         </div>
@@ -1738,9 +1844,10 @@ function MessageBubble({
             <div className="flex items-center gap-2">
               <span style={{ fontSize: 12, fontWeight: 400, lineHeight: '130%', color: 'var(--color-neutral-7)' }}>{author.name}</span>
               <span style={{ fontSize: 12, fontWeight: 400, lineHeight: '130%', color: 'var(--color-neutral-7)' }}>{formatBubbleTime(message, now)}</span>
+              {editedTag}
             </div>
           )}
-          {bubbleBlock}
+          {editComposer ?? bubbleBlock}
         </div>
       </div>
     </div>
@@ -1873,6 +1980,7 @@ function MessageArea({
   flashMessageId,
   flashToken,
   scrollToMessageId,
+  onEditMessage,
 }: {
   room: Room
   onOpenThread: (m: Message) => void
@@ -1880,6 +1988,8 @@ function MessageArea({
   lastReadMessageId?: string | null
   // Search-preview panel: hides reaction bars, disables thread navigation.
   readOnly?: boolean
+  // 自己的訊息 More → Edit(bubble 變編輯狀態);search preview(readOnly)不傳。
+  onEditMessage?: (messageId: string, payload: { text: string; html: string }) => void
   // The message to flash (indigo-6, one-time) — paired with flashToken so the
   // same message can be re-flashed on a later jump (bump flashToken).
   flashMessageId?: string | null
@@ -1934,6 +2044,7 @@ function MessageArea({
                   room={room}
                   readOnly={readOnly}
                   flashToken={m.id === flashMessageId ? flashToken : undefined}
+                  onEditMessage={onEditMessage}
                 />
               </Fragment>
             )
@@ -2232,11 +2343,18 @@ function SearchModal({
 }
 
 // InputBox — no top separator; single-line: textarea + buttons on same row;
-// multiline: textarea full-width on top, buttons row below
-function InputBox({ fullWidth, onSend }: { fullWidth: boolean; onSend: (text: string) => void }) {
+// multiline: textarea full-width on top, buttons row below.
+// Rich editor(Type 按鈕 toggle,對齊 Microsoft Teams format 模式):
+// - ON → compose box 展開:format toolbar 置頂(divider 分隔)+ contentEditable +
+//   按鈕列固定底部;Enter 換行、Ctrl/Cmd+Enter 或 Send 按鈕送出(Teams format 模式行為)
+// - OFF ⇄ ON 切換時保留已輸入內容(Teams 同)
+function InputBox({ fullWidth, onSend }: { fullWidth: boolean; onSend: (text: string, html?: string) => void }) {
   const [value, setValue] = useState('')
   const [multiline, setMultiline] = useState(false)
+  const [rich, setRich] = useState(false)
+  const [richHasValue, setRichHasValue] = useState(false)
   const ref = useRef<HTMLTextAreaElement>(null)
+  const richRef = useRef<RichEditorHandle>(null)
 
   useEffect(() => {
     const el = ref.current
@@ -2249,18 +2367,38 @@ function InputBox({ fullWidth, onSend }: { fullWidth: boolean; onSend: (text: st
   }, [value])
 
   function send() {
+    if (rich) {
+      const ed = richRef.current
+      if (!ed || ed.isEmpty()) return
+      onSend(ed.getText().trim(), ed.getHTML())
+      ed.clear()
+      setRichHasValue(false)
+      return
+    }
     if (!value.trim()) return
     onSend(value.trim())
     setValue('')
     setMultiline(false)
   }
 
-  const hasValue = value.trim().length > 0
+  // Rich editor toggle — 兩模式互轉皆保留內容(plain → escape 成 HTML;rich → 取純文字)
+  function toggleRich() {
+    if (!rich) {
+      setRichHasValue(value.trim().length > 0)
+      setRich(true)
+    } else {
+      const text = richRef.current?.getText().replace(/\n+$/, '') ?? ''
+      setValue(text)
+      setRich(false)
+    }
+  }
+
+  const hasValue = rich ? richHasValue : value.trim().length > 0
 
   const btn24 = '!h-6 !w-6 !min-w-0 !p-0'
   const actionButtons = (
     <div className="flex shrink-0 items-center gap-2">
-      <IconBtnSm icon={Type} label="Rich editor" className={btn24} />
+      <IconBtnSm icon={Type} label="Rich editor" onClick={toggleRich} className={`${btn24} ${rich ? '!bg-neutral-selected' : ''}`} />
       <IconBtnSm icon={Smile} label="Emoji" className={btn24} />
       <IconBtnSm icon={Plus} label="Attach files" className={btn24} />
       <Separator orientation="vertical" className="mx-1 h-5" />
@@ -2286,7 +2424,28 @@ function InputBox({ fullWidth, onSend }: { fullWidth: boolean; onSend: (text: st
             borderColor: hasValue ? 'var(--color-primary-hover)' : 'var(--color-border)',
           }}
         >
-          {multiline ? (
+          {rich ? (
+            <>
+              {/* Teams format 模式:toolbar 置頂 + divider,再來編輯區,按鈕列固定底部 */}
+              <div className="mb-1 border-b border-divider pb-1">
+                <FormatToolbar editorRef={richRef} />
+              </div>
+              <RichTextArea
+                ref={richRef}
+                placeholder="Type a message"
+                ariaLabel="Type a message"
+                initialHTML={textToHtml(value)}
+                autoFocus
+                enterMode="newline"
+                onSubmit={send}
+                onHasContentChange={setRichHasValue}
+                className="relative max-h-[190px] overflow-y-auto"
+              />
+              <div className="mt-1.5 flex items-center justify-end">
+                {actionButtons}
+              </div>
+            </>
+          ) : multiline ? (
             <>
               <Textarea
                 ref={ref}
@@ -2329,10 +2488,15 @@ function InputBox({ fullWidth, onSend }: { fullWidth: boolean; onSend: (text: st
 const THREAD_MIN = 320
 const THREAD_MAX = 720
 
-function ThreadInputBox({ onSend, onReply }: { onSend: (text: string, alsoSend: boolean) => void; onReply?: () => void }) {
+// Thread panel 輸入框 — Rich editor toggle 與主輸入框同款(Teams thread reply
+// compose 同樣有 format 按鈕;toolbar 置頂 + divider,Enter 換行 / Ctrl+Enter 送出)
+function ThreadInputBox({ onSend, onReply }: { onSend: (text: string, alsoSend: boolean, html?: string) => void; onReply?: () => void }) {
   const [value, setValue] = useState('')
   const [alsoSend, setAlsoSend] = useState(true)
+  const [rich, setRich] = useState(false)
+  const [richHasValue, setRichHasValue] = useState(false)
   const ref = useRef<HTMLTextAreaElement>(null)
+  const richRef = useRef<RichEditorHandle>(null)
 
   useEffect(() => {
     const el = ref.current
@@ -2341,29 +2505,68 @@ function ThreadInputBox({ onSend, onReply }: { onSend: (text: string, alsoSend: 
     el.style.height = `${Math.min(el.scrollHeight, 120)}px`
   }, [value])
 
-  const hasValue = value.trim().length > 0
+  const hasValue = rich ? richHasValue : value.trim().length > 0
 
   function send() {
+    if (rich) {
+      const ed = richRef.current
+      if (!ed || ed.isEmpty()) return
+      onSend(ed.getText().trim(), alsoSend, ed.getHTML())
+      onReply?.()
+      ed.clear()
+      setRichHasValue(false)
+      return
+    }
     if (!value.trim()) return
     onSend(value.trim(), alsoSend)
     onReply?.()
     setValue('')
   }
 
+  function toggleRich() {
+    if (!rich) {
+      setRichHasValue(value.trim().length > 0)
+      setRich(true)
+    } else {
+      const text = richRef.current?.getText().replace(/\n+$/, '') ?? ''
+      setValue(text)
+      setRich(false)
+    }
+  }
+
   return (
     <div className="bg-surface px-3 py-2 shrink-0">
       <div className="rounded-lg border border-border bg-canvas px-3 py-2 focus-within:border-border-hover">
-        <Textarea
-          ref={ref}
-          rows={1}
-          variant="bare"
-          placeholder="Reply in thread..."
-          aria-label="Reply in thread"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && e.keyCode !== 229) { e.preventDefault(); send() } }}
-          className="!resize-none !border-0 !px-0 !py-0 max-h-32"
-        />
+        {rich ? (
+          <>
+            <div className="mb-1 border-b border-divider pb-1">
+              <FormatToolbar editorRef={richRef} />
+            </div>
+            <RichTextArea
+              ref={richRef}
+              placeholder="Reply in thread..."
+              ariaLabel="Reply in thread"
+              initialHTML={textToHtml(value)}
+              autoFocus
+              enterMode="newline"
+              onSubmit={send}
+              onHasContentChange={setRichHasValue}
+              className="relative max-h-32 overflow-y-auto"
+            />
+          </>
+        ) : (
+          <Textarea
+            ref={ref}
+            rows={1}
+            variant="bare"
+            placeholder="Reply in thread..."
+            aria-label="Reply in thread"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && e.keyCode !== 229) { e.preventDefault(); send() } }}
+            className="!resize-none !border-0 !px-0 !py-0 max-h-32"
+          />
+        )}
         <div className="mt-1.5 flex items-center gap-2">
           <label className="flex flex-1 cursor-pointer items-center gap-1.5 text-caption text-fg-secondary select-none">
             <input
@@ -2374,6 +2577,7 @@ function ThreadInputBox({ onSend, onReply }: { onSend: (text: string, alsoSend: 
             />
             Also send to chatroom
           </label>
+          <IconBtnSm icon={Type} label="Rich editor" onClick={toggleRich} className={`!h-6 !w-6 !min-w-0 !p-0 ${rich ? '!bg-neutral-selected' : ''}`} />
           <Tooltip>
             <TooltipTrigger asChild>
               <Button variant={hasValue ? 'primary' : 'text'} size="sm" iconOnly startIcon={Send} aria-label="Send reply" title="" onClick={send} className="!h-6 !w-6 !min-w-0 !p-0" />
@@ -2397,6 +2601,7 @@ function ThreadPanel({
   onClose,
   onSend,
   onReply,
+  onEditMessage,
 }: {
   message: Message
   room: Room
@@ -2406,8 +2611,9 @@ function ThreadPanel({
   onExpand: () => void
   onCollapse: () => void
   onClose: () => void
-  onSend: (text: string, alsoSend: boolean) => void
+  onSend: (text: string, alsoSend: boolean, html?: string) => void
   onReply?: () => void
+  onEditMessage?: (messageId: string, payload: { text: string; html: string }) => void
 }) {
   const [dragging, setDragging] = useState(false)
   const author = message.author === 'me' ? ME : (PEOPLE[message.author] ?? null)
@@ -2468,6 +2674,7 @@ function ThreadPanel({
             onOpenThread={() => {}}
             room={room}
             isInThread
+            onEditMessage={onEditMessage}
           />
           {/* Thread replies */}
           {message.threadMessages && message.threadMessages.length > 0 && (
@@ -2483,6 +2690,7 @@ function ThreadPanel({
                     onOpenThread={() => {}}
                     room={room}
                     isInThread
+                    onEditMessage={onEditMessage}
                   />
                 ))
               })()}
@@ -2509,6 +2717,7 @@ function Conversation({
   onToggleFullWidth,
   onSend,
   onThreadSend,
+  onEditMessage,
   onAction,
   groupAvatarMode = 'icon',
   lastReadMessageId,
@@ -2523,8 +2732,10 @@ function Conversation({
   onToggleMute: () => void
   fullWidth: boolean
   onToggleFullWidth: () => void
-  onSend: (text: string) => void
-  onThreadSend: (parentId: string, text: string, alsoSend: boolean) => void
+  onSend: (text: string, html?: string) => void
+  onThreadSend: (parentId: string, text: string, alsoSend: boolean, html?: string) => void
+  // 自己的訊息 More → Edit 存檔(main area + thread panel 共用)
+  onEditMessage?: (messageId: string, payload: { text: string; html: string }) => void
   onAction?: (a: ChatAction) => void
   groupAvatarMode?: 'icon' | 'initial'
   lastReadMessageId?: string | null
@@ -2573,6 +2784,7 @@ function Conversation({
             flashMessageId={flashMessageId}
             flashToken={flashToken}
             scrollToMessageId={flashMessageId}
+            onEditMessage={onEditMessage}
           />
           <InputBox key={room.id} fullWidth={fullWidth} onSend={onSend} />
         </div>
@@ -2587,8 +2799,9 @@ function Conversation({
           onExpand={() => setThreadExpanded(true)}
           onCollapse={() => setThreadExpanded(false)}
           onClose={() => { setThreadParentId(null); setThreadExpanded(false) }}
-          onSend={(text, alsoSend) => onThreadSend(threadMessage.id, text, alsoSend)}
+          onSend={(text, alsoSend, html) => onThreadSend(threadMessage.id, text, alsoSend, html)}
           onReply={() => onAction?.({ type: 'thread-reply', roomId: room.id, messageId: threadMessage.id })}
+          onEditMessage={onEditMessage}
         />
       )}
     </section>
@@ -2790,21 +3003,21 @@ export default function App({
     else setFavOrder((prev) => [...prev, id])
   }
 
-  function handleSend(text: string) {
+  function handleSend(text: string, html?: string) {
     const now = new Date()
     const time = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
-    const newMsg: Message = { id: `sent-${Date.now()}`, author: 'me', text, time, msgStatus: 'sending' }
+    const newMsg: Message = { id: `sent-${Date.now()}`, author: 'me', text, html, time, msgStatus: 'sending' }
     setRooms((prev) => prev.map((r) =>
       r.id === activeId ? { ...r, messages: [...r.messages, newMsg] } : r
     ))
   }
 
-  function handleThreadSend(parentId: string, text: string, alsoSend: boolean) {
+  function handleThreadSend(parentId: string, text: string, alsoSend: boolean, html?: string) {
     const now = new Date()
     const time = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
     const baseId = `t-${Date.now()}`
     // Reply shown inside the thread panel — normal bubble, no "replied to a thread" link.
-    const threadReply: Message = { id: baseId, author: 'me', text, time, msgStatus: 'sent' }
+    const threadReply: Message = { id: baseId, author: 'me', text, html, time, msgStatus: 'sent' }
     setRooms((prev) => prev.map((r) => {
       if (r.id !== activeId) return r
       let messages = r.messages.map((m) =>
@@ -2812,10 +3025,27 @@ export default function App({
       )
       if (alsoSend) {
         // Main-area copy carries the back-link to its thread root.
-        const mainCopy: Message = { id: `${baseId}-main`, author: 'me', text, time, msgStatus: 'sent', repliedToThreadParentId: parentId }
+        const mainCopy: Message = { id: `${baseId}-main`, author: 'me', text, html, time, msgStatus: 'sent', repliedToThreadParentId: parentId }
         messages = [...messages, mainCopy]
       }
       return { ...r, messages }
+    }))
+  }
+
+  // 自己的訊息 More → Edit 存檔:同步更新 active room 的 main 訊息與 thread 回覆
+  // (兩處搜尋,messageId 全 room 唯一);標 edited(bubble 時間戳旁顯示「Edited」)。
+  function handleEditMessage(messageId: string, payload: { text: string; html: string }) {
+    setRooms((prev) => prev.map((r) => {
+      if (r.id !== activeId) return r
+      const patch = (m: Message): Message =>
+        m.id === messageId ? { ...m, text: payload.text, html: payload.html, edited: true } : m
+      return {
+        ...r,
+        messages: r.messages.map((m) => ({
+          ...patch(m),
+          threadMessages: m.threadMessages?.map(patch),
+        })),
+      }
     }))
   }
 
@@ -2865,6 +3095,7 @@ export default function App({
             onToggleMute={() => handleToggleMute(current.id)}
             onSend={handleSend}
             onThreadSend={handleThreadSend}
+            onEditMessage={handleEditMessage}
             onAction={onAction}
             groupAvatarMode={groupAvatarMode}
             lastReadMessageId={lastReadDivider?.roomId === current.id ? lastReadDivider.messageId : null}

@@ -20,3 +20,6 @@
 .scroll-hover:hover::-webkit-scrollbar-thumb {
   background: var(--color-neutral-4);
 }
+
+/* Rich text editor 樣式 → rich-text.css(RichTextEditor.tsx 直接 import;
+   Storybook preview 不載本檔,樣式必須跟著元件走才兩邊都吃得到)。 */
