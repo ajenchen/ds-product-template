@@ -81,6 +81,13 @@ export function textToHtml(text: string): string {
   return esc.replace(/\n/g, '<br>')
 }
 
+// 內容是否含格式標記(粗斜體 / 清單 / 連結 / 顏色 span 等)。純文字(含 <div>/<br>
+// 換行)不算 — 送出時 hasRichMarkup=false 就只存純文字,bubble 走原本 text 渲染路徑
+// (2026-07-09 v4:編輯引擎常駐 rich 後,避免每則訊息都變成 html 訊息)。
+export function hasRichMarkup(html: string): boolean {
+  return /<(b|strong|i|em|u|s|strike|ul|ol|a|font|blockquote|pre|hr|img|span)\b/i.test(html)
+}
+
 // URL 無 protocol 時補 https://(insert / edit link 共用)
 function ensureProtocol(url: string): string {
   return /^(https?|mailto):/i.test(url) ? url : `https://${url}`
@@ -255,6 +262,20 @@ export const RichTextArea = forwardRef<RichEditorHandle, {
         onKeyDown={(e) => {
           if (e.key === 'Escape') {
             onEscape?.()
+            return
+          }
+          if (e.key === 'Backspace' || e.key === 'Delete') {
+            // 全選刪除後 Chrome 會留下空的 <ol>/<ul>/<li> 或 <div><br>> 殘骸 —
+            // 看起來是空的但 DOM 不是,下一次輸入會意外接在清單裡、isEmpty 也誤判。
+            // 刪除鍵處理完後若無實際內容 → 徹底清空(markdown 捷徑產生的空 li 走
+            // Space 鍵,不受影響)。
+            requestAnimationFrame(() => {
+              const el = elRef.current
+              if (el && (el.textContent ?? '').trim() === '' && !el.querySelector('img,hr') && el.innerHTML !== '') {
+                el.innerHTML = ''
+                syncEmpty()
+              }
+            })
             return
           }
           if (e.key === ' ' && !e.nativeEvent.isComposing) {

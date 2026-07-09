@@ -14,7 +14,6 @@ import {
   Badge,
   Separator,
   ScrollArea,
-  Textarea,
   Popover,
   PopoverTrigger,
   PopoverContent,
@@ -74,7 +73,7 @@ import {
   Trash2,
   ChevronRight as SubArrow,
 } from 'lucide-react'
-import { FormatToolbar, RichTextArea, textToHtml, type RichEditorHandle } from './RichTextEditor'
+import { FormatToolbar, RichTextArea, textToHtml, hasRichMarkup, type RichEditorHandle } from './RichTextEditor'
 
 // ── Shared button primitives ──────────────────────────────────────────────────
 function NavBtn({
@@ -1486,7 +1485,7 @@ function EditMessageComposer({
   onCancel,
 }: {
   message: Message
-  onSave: (payload: { text: string; html: string }) => void
+  onSave: (payload: { text: string; html?: string }) => void
   onCancel: () => void
 }) {
   const editorRef = useRef<RichEditorHandle>(null)
@@ -1496,7 +1495,9 @@ function EditMessageComposer({
   function save() {
     const ed = editorRef.current
     if (!ed || ed.isEmpty()) return
-    onSave({ text: ed.getText().trim(), html: ed.getHTML() })
+    // 格式全被移除時不再帶 html(hasRichMarkup=false → bubble 回到純文字渲染)
+    const html = ed.getHTML()
+    onSave({ text: ed.getText().trim(), html: hasRichMarkup(html) ? html : undefined })
   }
 
   const btn24 = '!h-6 !w-6 !min-w-0 !p-0'
@@ -1557,7 +1558,7 @@ function MessageBubble({
   // background flash on this bubble — used when jumping to a message from search.
   flashToken?: number
   // 自己的訊息 hover → More → Edit:bubble 變編輯狀態(EditMessageComposer,含 rich toolbar)。
-  onEditMessage?: (messageId: string, payload: { text: string; html: string }) => void
+  onEditMessage?: (messageId: string, payload: { text: string; html?: string }) => void
 }) {
   const [flashing, setFlashing] = useState(false)
   const [editing, setEditing] = useState(false)
@@ -1988,7 +1989,7 @@ function MessageArea({
   // Search-preview panel: hides reaction bars, disables thread navigation.
   readOnly?: boolean
   // 自己的訊息 More → Edit(bubble 變編輯狀態);search preview(readOnly)不傳。
-  onEditMessage?: (messageId: string, payload: { text: string; html: string }) => void
+  onEditMessage?: (messageId: string, payload: { text: string; html?: string }) => void
   // The message to flash (indigo-6, one-time) — paired with flashToken so the
   // same message can be re-flashed on a later jump (bump flashToken).
   flashMessageId?: string | null
@@ -2341,58 +2342,41 @@ function SearchModal({
   )
 }
 
-// InputBox — no top separator; single-line: textarea + buttons on same row;
-// multiline: textarea full-width on top, buttons row below.
-// Rich editor(Type 按鈕 toggle,對齊 Microsoft Teams format 模式):
-// - ON → compose box 展開:format toolbar 置頂(divider 分隔)+ contentEditable +
-//   按鈕列固定底部;Enter 直接送出(list 內 = 換 item)、Shift+Enter 換行(2026-07-09 Enter 規則)
-// - OFF ⇄ ON 切換時保留已輸入內容(Teams 同)
+// InputBox — 編輯引擎常駐 rich contentEditable(2026-07-09 v4,對齊 Teams:compose box
+// 永遠是 rich editor,Type 按鈕只切換 format toolbar 顯示/隱藏)。因此鍵盤清單捷徑
+// (行首「-」/「*」/「1.」+ 空白)與 list 內 Enter 行為**不論工具列有沒有展開都可用**。
+// 佈局:單行 = 編輯區 + buttons 同排;多行(內容折行 / block 元素)或 toolbar 展開
+// = 編輯區全寬在上、buttons 獨立在下。三種狀態共用同一 DOM 結構(只換 class + 條件
+// slot),切換時編輯區不 remount、內容不丟失。
+// 送出:內容無格式標記(hasRichMarkup=false)→ 只送純文字(bubble 走原 text 渲染)。
 function InputBox({ fullWidth, onSend }: { fullWidth: boolean; onSend: (text: string, html?: string) => void }) {
-  const [value, setValue] = useState('')
   const [multiline, setMultiline] = useState(false)
   const [rich, setRich] = useState(false)
-  const [richHasValue, setRichHasValue] = useState(false)
-  const ref = useRef<HTMLTextAreaElement>(null)
+  const [hasValue, setHasValue] = useState(false)
   const richRef = useRef<RichEditorHandle>(null)
 
-  useEffect(() => {
-    const el = ref.current
-    if (!el) return
-    el.style.height = 'auto'
-    const scrollH = el.scrollHeight
-    // whole input box max height 280px → cap textarea growth (leaves room for padding + buttons)
-    el.style.height = `${Math.min(scrollH, 232)}px`
-    setMultiline(value.includes('\n') || scrollH > 44)
-  }, [value])
+  // 內容變動 → 同步 hasValue + multiline(單行高 21px,>30 = 已折行;或含 block 元素)
+  function syncFromEditor(hasContent: boolean) {
+    setHasValue(hasContent)
+    const el = richRef.current?.getElement()
+    setMultiline(!!el && (el.scrollHeight > 30 || !!el.querySelector('div,br,ul,ol,blockquote,pre')))
+  }
 
   function send() {
-    if (rich) {
-      const ed = richRef.current
-      if (!ed || ed.isEmpty()) return
-      onSend(ed.getText().trim(), ed.getHTML())
-      ed.clear()
-      setRichHasValue(false)
-      return
-    }
-    if (!value.trim()) return
-    onSend(value.trim())
-    setValue('')
-    setMultiline(false)
+    const ed = richRef.current
+    if (!ed || ed.isEmpty()) return
+    const html = ed.getHTML()
+    onSend(ed.getText().trim(), hasRichMarkup(html) ? html : undefined)
+    ed.clear() // clear → onHasContentChange(false) → syncFromEditor 收回 hasValue/multiline
   }
 
-  // Rich editor toggle — 兩模式互轉皆保留內容(plain → escape 成 HTML;rich → 取純文字)
   function toggleRich() {
-    if (!rich) {
-      setRichHasValue(value.trim().length > 0)
-      setRich(true)
-    } else {
-      const text = richRef.current?.getText().replace(/\n+$/, '') ?? ''
-      setValue(text)
-      setRich(false)
-    }
+    setRich((v) => !v)
+    richRef.current?.focus()
   }
 
-  const hasValue = rich ? richHasValue : value.trim().length > 0
+  // toolbar 展開或內容多行 → column 佈局(編輯區全寬、buttons 下移)
+  const column = rich || multiline
 
   const btn24 = '!h-6 !w-6 !min-w-0 !p-0'
   const actionButtons = (
@@ -2423,59 +2407,26 @@ function InputBox({ fullWidth, onSend }: { fullWidth: boolean; onSend: (text: st
             borderColor: hasValue ? 'var(--color-primary-hover)' : 'var(--color-border)',
           }}
         >
-          {rich ? (
-            <>
-              {/* Teams format 模式:toolbar 置頂 + divider,再來編輯區,按鈕列固定底部 */}
+          {/* 同一容器 + 條件 slot:children index 穩定,rich/multiline 切換時
+              RichTextArea 不 remount(contentEditable 的 DOM 內容才不會丟失) */}
+          <div className={column ? undefined : 'flex items-center gap-2'}>
+            {rich && (
               <div className="mb-1 border-b border-divider pb-1">
                 <FormatToolbar editorRef={richRef} />
               </div>
-              <RichTextArea
-                ref={richRef}
-                placeholder="Type a message"
-                ariaLabel="Type a message"
-                initialHTML={textToHtml(value)}
-                autoFocus
-                onSubmit={send}
-                onHasContentChange={setRichHasValue}
-                className="relative max-h-[190px] overflow-y-auto"
-              />
-              <div className="mt-1.5 flex items-center justify-end">
-                {actionButtons}
-              </div>
-            </>
-          ) : multiline ? (
-            <>
-              <Textarea
-                ref={ref}
-                rows={1}
-                variant="bare"
-                placeholder="Type a message"
-                aria-label="Type a message"
-                value={value}
-                onChange={(e) => setValue(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && e.keyCode !== 229) { e.preventDefault(); send() } }}
-                className="!resize-none !border-0 !p-0 w-full max-h-[232px] overflow-y-auto"
-              />
-              <div className="mt-1.5 flex items-center justify-end">
-                {actionButtons}
-              </div>
-            </>
-          ) : (
-            <div className="flex items-center gap-2">
-              <Textarea
-                ref={ref}
-                rows={1}
-                variant="bare"
-                placeholder="Type a message"
-                aria-label="Type a message"
-                value={value}
-                onChange={(e) => setValue(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && e.keyCode !== 229) { e.preventDefault(); send() } }}
-                className="!resize-none !border-0 !p-0 min-w-0 flex-1 max-h-[232px] overflow-y-auto"
-              />
+            )}
+            <RichTextArea
+              ref={richRef}
+              placeholder="Type a message"
+              ariaLabel="Type a message"
+              onSubmit={send}
+              onHasContentChange={syncFromEditor}
+              className={column ? 'relative w-full max-h-[190px] overflow-y-auto' : 'relative min-w-0 flex-1 max-h-[190px] overflow-y-auto'}
+            />
+            <div className={column ? 'mt-1.5 flex items-center justify-end' : 'shrink-0'}>
               {actionButtons}
             </div>
-          )}
+          </div>
         </div>
       </div>
     </div>
@@ -2486,85 +2437,46 @@ function InputBox({ fullWidth, onSend }: { fullWidth: boolean; onSend: (text: st
 const THREAD_MIN = 320
 const THREAD_MAX = 720
 
-// Thread panel 輸入框 — Rich editor toggle 與主輸入框同款(Teams thread reply
-// compose 同樣有 format 按鈕;toolbar 置頂 + divider;Enter 直接送出(list 內 = 換 item)、
-// Shift+Enter 換行(2026-07-09 Enter 規則,與主輸入框一致)
+// Thread panel 輸入框 — 編輯引擎常駐 rich contentEditable(2026-07-09 v4,與主輸入框
+// 同款):Type 按鈕只切換 toolbar 顯示,鍵盤清單捷徑 / list 內 Enter 行為不論工具列
+// 開關都可用;Enter 直接送出(list 內 = 換 item)、Shift+Enter 換行。
+// 送出:內容無格式標記(hasRichMarkup=false)→ 只送純文字。
 function ThreadInputBox({ onSend, onReply }: { onSend: (text: string, alsoSend: boolean, html?: string) => void; onReply?: () => void }) {
-  const [value, setValue] = useState('')
   const [alsoSend, setAlsoSend] = useState(true)
   const [rich, setRich] = useState(false)
-  const [richHasValue, setRichHasValue] = useState(false)
-  const ref = useRef<HTMLTextAreaElement>(null)
+  const [hasValue, setHasValue] = useState(false)
   const richRef = useRef<RichEditorHandle>(null)
 
-  useEffect(() => {
-    const el = ref.current
-    if (!el) return
-    el.style.height = 'auto'
-    el.style.height = `${Math.min(el.scrollHeight, 120)}px`
-  }, [value])
-
-  const hasValue = rich ? richHasValue : value.trim().length > 0
-
   function send() {
-    if (rich) {
-      const ed = richRef.current
-      if (!ed || ed.isEmpty()) return
-      onSend(ed.getText().trim(), alsoSend, ed.getHTML())
-      onReply?.()
-      ed.clear()
-      setRichHasValue(false)
-      return
-    }
-    if (!value.trim()) return
-    onSend(value.trim(), alsoSend)
+    const ed = richRef.current
+    if (!ed || ed.isEmpty()) return
+    const html = ed.getHTML()
+    onSend(ed.getText().trim(), alsoSend, hasRichMarkup(html) ? html : undefined)
     onReply?.()
-    setValue('')
+    ed.clear()
   }
 
   function toggleRich() {
-    if (!rich) {
-      setRichHasValue(value.trim().length > 0)
-      setRich(true)
-    } else {
-      const text = richRef.current?.getText().replace(/\n+$/, '') ?? ''
-      setValue(text)
-      setRich(false)
-    }
+    setRich((v) => !v)
+    richRef.current?.focus()
   }
 
   return (
     <div className="bg-surface px-3 py-2 shrink-0">
       <div className="rounded-lg border border-border bg-canvas px-3 py-2 focus-within:border-border-hover">
-        {rich ? (
-          <>
-            <div className="mb-1 border-b border-divider pb-1">
-              <FormatToolbar editorRef={richRef} />
-            </div>
-            <RichTextArea
-              ref={richRef}
-              placeholder="Reply in thread..."
-              ariaLabel="Reply in thread"
-              initialHTML={textToHtml(value)}
-              autoFocus
-              onSubmit={send}
-              onHasContentChange={setRichHasValue}
-              className="relative max-h-32 overflow-y-auto"
-            />
-          </>
-        ) : (
-          <Textarea
-            ref={ref}
-            rows={1}
-            variant="bare"
-            placeholder="Reply in thread..."
-            aria-label="Reply in thread"
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && e.keyCode !== 229) { e.preventDefault(); send() } }}
-            className="!resize-none !border-0 !px-0 !py-0 max-h-32"
-          />
+        {rich && (
+          <div className="mb-1 border-b border-divider pb-1">
+            <FormatToolbar editorRef={richRef} />
+          </div>
         )}
+        <RichTextArea
+          ref={richRef}
+          placeholder="Reply in thread..."
+          ariaLabel="Reply in thread"
+          onSubmit={send}
+          onHasContentChange={setHasValue}
+          className="relative max-h-32 overflow-y-auto"
+        />
         <div className="mt-1.5 flex items-center gap-2">
           <label className="flex flex-1 cursor-pointer items-center gap-1.5 text-caption text-fg-secondary select-none">
             <input
@@ -2611,7 +2523,7 @@ function ThreadPanel({
   onClose: () => void
   onSend: (text: string, alsoSend: boolean, html?: string) => void
   onReply?: () => void
-  onEditMessage?: (messageId: string, payload: { text: string; html: string }) => void
+  onEditMessage?: (messageId: string, payload: { text: string; html?: string }) => void
 }) {
   const [dragging, setDragging] = useState(false)
   const author = message.author === 'me' ? ME : (PEOPLE[message.author] ?? null)
@@ -2733,7 +2645,7 @@ function Conversation({
   onSend: (text: string, html?: string) => void
   onThreadSend: (parentId: string, text: string, alsoSend: boolean, html?: string) => void
   // 自己的訊息 More → Edit 存檔(main area + thread panel 共用)
-  onEditMessage?: (messageId: string, payload: { text: string; html: string }) => void
+  onEditMessage?: (messageId: string, payload: { text: string; html?: string }) => void
   onAction?: (a: ChatAction) => void
   groupAvatarMode?: 'icon' | 'initial'
   lastReadMessageId?: string | null
@@ -3032,7 +2944,7 @@ export default function App({
 
   // 自己的訊息 More → Edit 存檔:同步更新 active room 的 main 訊息與 thread 回覆
   // (兩處搜尋,messageId 全 room 唯一);標 edited(bubble 時間戳旁顯示「Edited」)。
-  function handleEditMessage(messageId: string, payload: { text: string; html: string }) {
+  function handleEditMessage(messageId: string, payload: { text: string; html?: string }) {
     setRooms((prev) => prev.map((r) => {
       if (r.id !== activeId) return r
       const patch = (m: Message): Message =>
