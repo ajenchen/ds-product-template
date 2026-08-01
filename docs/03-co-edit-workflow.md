@@ -20,8 +20,8 @@ git push -u origin feat/<your-feature-name>
 
 ## CI 自動跑(每 PR / push)
 
-- `audit.yml`:tsc + lint:imports + build all apps
-- `sync-design-system.yml`:`repository_dispatch`(DS publish 後 auto dispatch `design-system-published` / `ds-ssot-changed`)+ `workflow_dispatch`(fork user 主動觸發)。**2026-05-27 拿掉 daily cron** per user verbatim「只要確保主動更新時能同步到最新就好」。Fallback:Dependabot daily auto-PR(若 DS dispatch 失敗)
+- `audit.yml`:單次 locked install + tsc + lint:imports + build all apps，發布唯一 required context `Verify consumer`
+- Exact template 更新由上游 release mirror 建立一般 protected-main PR；template 不保留第二條 release-dispatch/updater workflow
 - Storybook deploy 走 `netlify.toml` Git integration auto-build,不需 workflow file
 
 ## Code review(CODEOWNERS)
@@ -57,7 +57,7 @@ git push --force-with-lease
 
 - **禁** 改 `node_modules/@qijenchen/design-system/`(直接改 node_modules 是 antipattern)
 - **禁** import DS internal paths(`/src/...` / `/dist/...`)— hook 攔
-- **禁** force-push main(branch protection 應該攔)
+- **禁** force-push/direct-push main(branch ruleset 必須攔)
 
 ## Next
 
