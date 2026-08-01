@@ -39,8 +39,14 @@ import {
   Avatar,
   ItemAvatar,
   Button,
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuGroup,
 } from '@qijenchen/design-system'
-import { LayoutDashboard, Users, Settings, FileText, BarChart3 } from 'lucide-react'
+import { LayoutDashboard, Users, Settings, FileText, BarChart3, User, LogOut } from 'lucide-react'
 
 const NAV = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -56,6 +62,7 @@ function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarHeader>
         {/* Chrome header avatar canonical(per header-canonical.spec.md:57-72):chrome header 不是 row context → raw <Avatar size={24}>,禁用 <ItemAvatar>(會誤啟動 row anatomy lookup)*/}
+        {/* @layout-space-magic-ok: Sidebar#IconCollapse chrome-header-brand baseline owns fixed 8px Avatar-to-label micro spacing; layout-space tokens govern macro spacing */}
         <div className="flex items-center gap-2 min-w-0 group-data-[collapsible=icon]:justify-center">
           <Avatar alt="Acme Product" size={24} shape="square" color="blue" solid />
           <span className="text-body-lg font-medium truncate group-data-[collapsible=icon]:hidden">Acme Product</span>
@@ -77,15 +84,32 @@ function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter>
-        {/* 對齊 DS canonical UserFooter(sidebar.stories.tsx):asChild + <div role="group"> + data-sidebar="menu-label" 必有,否則 SidebarMenuButton 把 children 全 wrap 進 ItemLabel 視覺垂直 stack */}
+        {/* 對齊 DS canonical UserFooter(sidebar.stories.tsx):footer user 行 = 帳號入口,點開帳號選單
+            (DropdownMenu;rule owner = app-shell.spec.md「帳號入口(Account entry)放置 SSOT」——
+            自己的 avatar 不掛 ProfileCard,那是看「別人」的人員卡)。asChild + <button type="button">
+            + data-sidebar="menu-label" 必有,否則 SidebarMenuButton 把 children 全 wrap 進 ItemLabel 視覺垂直 stack */}
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild>
-              <div role="group" aria-label="當前使用者">
-                <ItemAvatar alt="Current user" color="blue" />
-                <span data-sidebar="menu-label" className="min-w-0 flex-1 truncate">當前使用者</span>
-              </div>
-            </SidebarMenuButton>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <SidebarMenuButton asChild tooltip="當前使用者">
+                  <button type="button" aria-label="帳號與設定">
+                    <ItemAvatar alt="Current user" color="blue" />
+                    <span data-sidebar="menu-label" className="min-w-0 flex-1 truncate">當前使用者</span>
+                  </button>
+                </SidebarMenuButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" minWidth={280}>
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel>當前使用者</DropdownMenuLabel>
+                  <DropdownMenuItem startIcon={User}>個人資料</DropdownMenuItem>
+                  <DropdownMenuItem startIcon={Settings}>設定</DropdownMenuItem>
+                </DropdownMenuGroup>
+                <DropdownMenuGroup>
+                  <DropdownMenuItem startIcon={LogOut}>登出</DropdownMenuItem>
+                </DropdownMenuGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
@@ -118,7 +142,7 @@ function DashboardPage() {
   return (
     <div className="px-[var(--layout-space-loose)] py-[var(--layout-space-tight)] space-y-[var(--layout-space-loose)]">
       <section>
-        <h2 className="text-h5 mb-2">Today</h2>
+        <h2 className="text-h5 mb-[var(--layout-space-tight)]">Today</h2>
         <p className="text-body text-fg-secondary">
           替換為真實業務 — 訂單 / 收入 / 待處理任務等 dashboard widgets。Consume DS components
           (DataTable / Chart / Card / Stat 等),never modify DS source。
@@ -128,6 +152,7 @@ function DashboardPage() {
         {['Revenue', 'Active customers', 'Pending orders'].map((label) => (
           <div key={label} className="rounded-lg border border-divider bg-surface p-[var(--layout-space-loose)]">
             <div className="text-caption text-fg-secondary">{label}</div>
+            {/* @layout-space-magic-ok: Sidebar#IconCollapse PageContent metric-card baseline owns fixed 4px label-to-value micro spacing; not macro layout */}
             <div className="text-h3 mt-1">—</div>
           </div>
         ))}

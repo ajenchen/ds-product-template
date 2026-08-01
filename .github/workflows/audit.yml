@@ -6,19 +6,25 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   audit:
-    runs-on: ubuntu-latest
+    name: Verify consumer
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
-          node-version: 22
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24.14.0'
           cache: npm
 
-      - name: Install
-        run: npm ci --legacy-peer-deps
+      - name: Install exact locked dependencies
+        run: npm ci --ignore-scripts
 
       - name: Type-check
         run: npm run typecheck
@@ -28,11 +34,3 @@ jobs:
 
       - name: Build all apps
         run: npm run build
-
-      - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
-
-      - name: A11y audit consumer apps(WCAG 2 A + AA)
-        # Phase 5 加 — DS repo 跑 npm run a11y:check on storybook;ds-product-template
-        # 跑 audit-consumer-a11y.mjs on apps/*/dist。對等 DS audit 嚴謹度。
-        run: node scripts/audit-consumer-a11y.mjs

@@ -1,20 +1,283 @@
 {
-  "defaultMode": "auto",
-  "_comment_governance": "C-prime committed-config-first 治理。SessionStart 跑 inject_fork_governance_preamble.sh(install-if-missing 治理本體 + 注入設計紀律 preamble,單一 process 內 sequential 避免並行 race);Pre/Post/UserPromptSubmit 跑 fork-governance-dispatcher.sh(讀 node_modules/@qijenchen/design-system/ds-canonical/fork/manifest.json 跑官方 fork 治理)。治理本體在 node_modules(npm install 覆蓋 = 官方控管、使用者改不動);DS 未來治理增刪改 → npm install / npm run sync-all 即完全同步(連本檔 hooks 區塊 + 啟動器也由 sync-all 從 npm idempotent 刷新,帶 .github/no-governance-sync opt-out)。首次啟用:npm install。既有 fork adopt/同步骨架:npm run sync-all。不需 /plugin install。",
+  "_comment_governance": "Provider-neutral committed adapter. Engineering external writes, package installation, and publication are standing-delegated when canonical preflight, least privilege, evidence, rollback, and readback gates pass; raw destructive or bypass commands remain denied. Only platform-enforced login/MFA/OAuth, missing credential references, plan-external spend, legal/account/organization commitments, and genuine product/UI/UX SSOT choices require human action. Native hooks accelerate feedback while provider-neutral checks and protected CI remain authoritative.",
   "permissions": {
     "allow": [
-      "Bash(npm install)",
-      "Bash(npm ci)",
-      "Bash(npm run *)",
-      "Bash(npx *)",
-      "Bash(git *)"
-    ]
+      "Edit"
+    ],
+    "deny": [
+      "Bash(gh auth token*)",
+      "Bash(gh secret set*)",
+      "Bash(gh secret delete*)",
+      "Bash(gh variable set*)",
+      "Bash(gh variable delete*)",
+      "Bash(git credential *)",
+      "Bash(npm token *)",
+      "Bash(ssh-add*)",
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./secrets/**)",
+      "Read(~/.aws/**)",
+      "Read(~/.azure/**)",
+      "Read(~/.config/gcloud/**)",
+      "Read(~/.docker/**)",
+      "Read(~/.git-credentials)",
+      "Read(~/.gnupg/**)",
+      "Read(~/.kube/**)",
+      "Read(~/.netrc)",
+      "Read(~/.npmrc)",
+      "Read(~/.pypirc)",
+      "Read(~/.ssh/**)",
+      "Bash(git reset *)",
+      "Bash(git clean *)",
+      "Bash(git branch -D *)",
+      "Bash(git tag -d *)",
+      "Bash(git commit --amend *)",
+      "Bash(git checkout *)",
+      "Bash(git restore *)",
+      "Bash(git push *--force*)",
+      "Bash(git push -f *)",
+      "Bash(gh api *--method DELETE*)",
+      "Bash(gh api *-X DELETE*)",
+      "Bash(gh issue delete *)",
+      "Bash(gh release delete *)",
+      "Bash(gh repo delete *)",
+      "Bash(gh run delete *)",
+      "Bash(npm unpublish *)",
+      "Bash(npm deprecate *)",
+      "Bash(rm *)",
+      "Bash(find * -delete *)",
+      "Bash(dd *)",
+      "Bash(mkfs *)",
+      "Bash(shred *)",
+      "Bash(*--dangerously-skip-permissions*)",
+      "Bash(*--permission-mode bypassPermissions*)",
+      "Bash(*--dangerously-bypass-approvals-and-sandbox*)"
+    ],
+    "defaultMode": "acceptEdits",
+    "ask": [
+      "Bash(claude auth login*)",
+      "Bash(claude login*)",
+      "Bash(gh auth login*)",
+      "Bash(gh auth refresh*)",
+      "Bash(npm access grant *)",
+      "Bash(npm access revoke *)",
+      "Bash(npm access set *)",
+      "Bash(npm adduser*)",
+      "Bash(npm login*)",
+      "Bash(npm org set *)",
+      "Bash(npm org rm *)",
+      "Bash(npm owner add *)",
+      "Bash(npm owner rm *)",
+      "Bash(npm profile *2fa*)",
+      "Bash(docker login*)",
+      "Bash(aws configure*)",
+      "Bash(aws sso login*)",
+      "Bash(gcloud auth *)",
+      "Bash(az login*)",
+      "Bash(netlify login*)",
+      "Bash(vercel login*)"
+    ],
+    "disableBypassPermissionsMode": "disable"
+  },
+  "sandbox": {
+    "enabled": true,
+    "failIfUnavailable": true,
+    "autoAllowBashIfSandboxed": true,
+    "allowUnsandboxedCommands": false,
+    "network": {
+      "allowedDomains": [],
+      "deniedDomains": [],
+      "allowUnixSockets": [],
+      "allowAllUnixSockets": false,
+      "allowLocalBinding": true,
+      "allowMachLookup": []
+    },
+    "filesystem": {
+      "allowWrite": [],
+      "denyWrite": [],
+      "denyRead": [],
+      "allowRead": []
+    },
+    "credentials": {
+      "files": [
+        {
+          "path": "./.env",
+          "mode": "deny"
+        },
+        {
+          "path": "./.env.*",
+          "mode": "deny"
+        },
+        {
+          "path": "./secrets/**",
+          "mode": "deny"
+        },
+        {
+          "path": "~/.aws/config",
+          "mode": "deny"
+        },
+        {
+          "path": "~/.aws/credentials",
+          "mode": "deny"
+        },
+        {
+          "path": "~/.azure/**",
+          "mode": "deny"
+        },
+        {
+          "path": "~/.config/gcloud/**",
+          "mode": "deny"
+        },
+        {
+          "path": "~/.docker/config.json",
+          "mode": "deny"
+        },
+        {
+          "path": "~/.git-credentials",
+          "mode": "deny"
+        },
+        {
+          "path": "~/.gnupg/**",
+          "mode": "deny"
+        },
+        {
+          "path": "~/.kube/config",
+          "mode": "deny"
+        },
+        {
+          "path": "~/.netrc",
+          "mode": "deny"
+        },
+        {
+          "path": "~/.npmrc",
+          "mode": "deny"
+        },
+        {
+          "path": "~/.pypirc",
+          "mode": "deny"
+        },
+        {
+          "path": "~/.ssh/**",
+          "mode": "deny"
+        }
+      ],
+      "envVars": [
+        {
+          "name": "ANTHROPIC_API_KEY",
+          "mode": "deny"
+        },
+        {
+          "name": "AWS_ACCESS_KEY_ID",
+          "mode": "deny"
+        },
+        {
+          "name": "AWS_CONTAINER_AUTHORIZATION_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "AWS_CONTAINER_CREDENTIALS_FULL_URI",
+          "mode": "deny"
+        },
+        {
+          "name": "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI",
+          "mode": "deny"
+        },
+        {
+          "name": "AWS_SECRET_ACCESS_KEY",
+          "mode": "deny"
+        },
+        {
+          "name": "AWS_SESSION_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "AWS_WEB_IDENTITY_TOKEN_FILE",
+          "mode": "deny"
+        },
+        {
+          "name": "AZURE_CLIENT_CERTIFICATE_PATH",
+          "mode": "deny"
+        },
+        {
+          "name": "AZURE_CLIENT_SECRET",
+          "mode": "deny"
+        },
+        {
+          "name": "AZURE_FEDERATED_TOKEN_FILE",
+          "mode": "deny"
+        },
+        {
+          "name": "CLAUDE_CODE_OAUTH_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "DOCKER_AUTH_CONFIG",
+          "mode": "deny"
+        },
+        {
+          "name": "GH_ENTERPRISE_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "GH_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "GITHUB_APP_PRIVATE_KEY",
+          "mode": "deny"
+        },
+        {
+          "name": "GITHUB_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "GOOGLE_APPLICATION_CREDENTIALS",
+          "mode": "deny"
+        },
+        {
+          "name": "GOOGLE_GHA_CREDS_PATH",
+          "mode": "deny"
+        },
+        {
+          "name": "NETLIFY_AUTH_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "NODE_AUTH_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "NPM_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "SIGSTORE_ID_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "SSH_AUTH_SOCK",
+          "mode": "deny"
+        },
+        {
+          "name": "VERCEL_TOKEN",
+          "mode": "deny"
+        }
+      ],
+      "allowPlaintextInject": false
+    },
+    "enableWeakerNestedSandbox": false,
+    "enableWeakerNetworkIsolation": false,
+    "allowAppleEvents": false,
+    "excludedCommands": []
   },
   "hooks": {
     "SessionStart": [
       {
         "hooks": [
-          { "type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/inject_fork_governance_preamble.sh\"" }
+          {
+            "type": "command",
+            "command": "/usr/bin/env -u PATH -u GIT_DIR -u GIT_WORK_TREE -u GIT_COMMON_DIR -u GIT_OBJECT_DIRECTORY -u GIT_ALTERNATE_OBJECT_DIRECTORIES -u GIT_INDEX_FILE -u GIT_CONFIG -u GIT_CONFIG_SYSTEM -u GIT_CONFIG_GLOBAL -u GIT_CONFIG_NOSYSTEM -u GIT_CONFIG_COUNT -u BASH_ENV -u ENV -u SHELLOPTS -u BASHOPTS -u CDPATH -u GLOBIGNORE -u NODE_OPTIONS -u NODE_PATH -u PYTHONHOME -u PYTHONPATH -u PYTHONSTARTUP -u PYTHONINSPECT -u PERL5OPT -u RUBYOPT -u LD_PRELOAD -u LD_LIBRARY_PATH -u DYLD_INSERT_LIBRARIES -u DYLD_LIBRARY_PATH -u DYLD_FRAMEWORK_PATH -u DYLD_FALLBACK_LIBRARY_PATH -u DYLD_FALLBACK_FRAMEWORK_PATH PATH=/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/opt/homebrew/bin:/home/linuxbrew/.linuxbrew/bin /bin/bash -- governance/bin/inject_fork_governance_preamble.sh claude"
+          }
         ]
       }
     ],
@@ -22,7 +285,10 @@
       {
         "matcher": "Edit|Write|MultiEdit",
         "hooks": [
-          { "type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/fork-governance-dispatcher.sh\"" }
+          {
+            "type": "command",
+            "command": "/usr/bin/env -u PATH -u GIT_DIR -u GIT_WORK_TREE -u GIT_COMMON_DIR -u GIT_OBJECT_DIRECTORY -u GIT_ALTERNATE_OBJECT_DIRECTORIES -u GIT_INDEX_FILE -u GIT_CONFIG -u GIT_CONFIG_SYSTEM -u GIT_CONFIG_GLOBAL -u GIT_CONFIG_NOSYSTEM -u GIT_CONFIG_COUNT -u BASH_ENV -u ENV -u SHELLOPTS -u BASHOPTS -u CDPATH -u GLOBIGNORE -u NODE_OPTIONS -u NODE_PATH -u PYTHONHOME -u PYTHONPATH -u PYTHONSTARTUP -u PYTHONINSPECT -u PERL5OPT -u RUBYOPT -u LD_PRELOAD -u LD_LIBRARY_PATH -u DYLD_INSERT_LIBRARIES -u DYLD_LIBRARY_PATH -u DYLD_FRAMEWORK_PATH -u DYLD_FALLBACK_LIBRARY_PATH -u DYLD_FALLBACK_FRAMEWORK_PATH PATH=/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/opt/homebrew/bin:/home/linuxbrew/.linuxbrew/bin /bin/bash -- governance/bin/fork-governance-dispatcher.sh claude"
+          }
         ]
       }
     ],
@@ -30,14 +296,30 @@
       {
         "matcher": "Edit|Write|MultiEdit|Bash",
         "hooks": [
-          { "type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/fork-governance-dispatcher.sh\"" }
+          {
+            "type": "command",
+            "command": "/usr/bin/env -u PATH -u GIT_DIR -u GIT_WORK_TREE -u GIT_COMMON_DIR -u GIT_OBJECT_DIRECTORY -u GIT_ALTERNATE_OBJECT_DIRECTORIES -u GIT_INDEX_FILE -u GIT_CONFIG -u GIT_CONFIG_SYSTEM -u GIT_CONFIG_GLOBAL -u GIT_CONFIG_NOSYSTEM -u GIT_CONFIG_COUNT -u BASH_ENV -u ENV -u SHELLOPTS -u BASHOPTS -u CDPATH -u GLOBIGNORE -u NODE_OPTIONS -u NODE_PATH -u PYTHONHOME -u PYTHONPATH -u PYTHONSTARTUP -u PYTHONINSPECT -u PERL5OPT -u RUBYOPT -u LD_PRELOAD -u LD_LIBRARY_PATH -u DYLD_INSERT_LIBRARIES -u DYLD_LIBRARY_PATH -u DYLD_FRAMEWORK_PATH -u DYLD_FALLBACK_LIBRARY_PATH -u DYLD_FALLBACK_FRAMEWORK_PATH PATH=/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/opt/homebrew/bin:/home/linuxbrew/.linuxbrew/bin /bin/bash -- governance/bin/fork-governance-dispatcher.sh claude"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/env -u PATH -u GIT_DIR -u GIT_WORK_TREE -u GIT_COMMON_DIR -u GIT_OBJECT_DIRECTORY -u GIT_ALTERNATE_OBJECT_DIRECTORIES -u GIT_INDEX_FILE -u GIT_CONFIG -u GIT_CONFIG_SYSTEM -u GIT_CONFIG_GLOBAL -u GIT_CONFIG_NOSYSTEM -u GIT_CONFIG_COUNT -u BASH_ENV -u ENV -u SHELLOPTS -u BASHOPTS -u CDPATH -u GLOBIGNORE -u NODE_OPTIONS -u NODE_PATH -u PYTHONHOME -u PYTHONPATH -u PYTHONSTARTUP -u PYTHONINSPECT -u PERL5OPT -u RUBYOPT -u LD_PRELOAD -u LD_LIBRARY_PATH -u DYLD_INSERT_LIBRARIES -u DYLD_LIBRARY_PATH -u DYLD_FRAMEWORK_PATH -u DYLD_FALLBACK_LIBRARY_PATH -u DYLD_FALLBACK_FRAMEWORK_PATH PATH=/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/opt/homebrew/bin:/home/linuxbrew/.linuxbrew/bin /bin/bash -- governance/bin/fork-governance-dispatcher.sh claude"
+          }
         ]
       }
     ],
     "UserPromptSubmit": [
       {
         "hooks": [
-          { "type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/fork-governance-dispatcher.sh\"" }
+          {
+            "type": "command",
+            "command": "/usr/bin/env -u PATH -u GIT_DIR -u GIT_WORK_TREE -u GIT_COMMON_DIR -u GIT_OBJECT_DIRECTORY -u GIT_ALTERNATE_OBJECT_DIRECTORIES -u GIT_INDEX_FILE -u GIT_CONFIG -u GIT_CONFIG_SYSTEM -u GIT_CONFIG_GLOBAL -u GIT_CONFIG_NOSYSTEM -u GIT_CONFIG_COUNT -u BASH_ENV -u ENV -u SHELLOPTS -u BASHOPTS -u CDPATH -u GLOBIGNORE -u NODE_OPTIONS -u NODE_PATH -u PYTHONHOME -u PYTHONPATH -u PYTHONSTARTUP -u PYTHONINSPECT -u PERL5OPT -u RUBYOPT -u LD_PRELOAD -u LD_LIBRARY_PATH -u DYLD_INSERT_LIBRARIES -u DYLD_LIBRARY_PATH -u DYLD_FRAMEWORK_PATH -u DYLD_FALLBACK_LIBRARY_PATH -u DYLD_FALLBACK_FRAMEWORK_PATH PATH=/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/opt/homebrew/bin:/home/linuxbrew/.linuxbrew/bin /bin/bash -- governance/bin/fork-governance-dispatcher.sh claude"
+          }
         ]
       }
     ]
