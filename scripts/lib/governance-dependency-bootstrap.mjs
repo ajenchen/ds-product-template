@@ -26,6 +26,34 @@ export const GOVERNANCE_DEPENDENCY_NPM_STEPS = Object.freeze([
   Object.freeze(['audit', '--audit-level=high', '--json', `--registry=${GOVERNANCE_DEPENDENCY_REGISTRY}`]),
 ])
 
+// 2026-09-23:歷史參考樹(視覺回歸重拍把 8/5 的 commit 放到同一個容器重拍,run #291)永遠無法滿足「今天」的弱點
+// 資料庫 —— 那棵樹的相依是八月鎖定的,之後才登記的 advisory(baseline-browser-mapping 2.10.43)它不可能修。
+// 完整性(lock 精確安裝 / 簽章 / attestation)照舊 fail closed;只有弱點稽核在 `report-render-only-reference` 政策
+// 下改為「跑、印、記進 receipt、不擋」。這個政策只准用在無憑證、用完即丟的渲染容器(workflow 明文指定),預設仍是 enforce。
+export const GOVERNANCE_VULNERABILITY_POLICIES = Object.freeze(['enforce', 'report-render-only-reference'])
+
+export function runVulnerabilityAuditUnderPolicy(policy, run, {
+  errorPrefix = 'GOV-DEPENDENCY-BOOTSTRAP-001',
+  report = (line) => console.error(line),
+} = {}) {
+  invariant(GOVERNANCE_VULNERABILITY_POLICIES.includes(policy), `unsupported vulnerability policy:${String(policy)}`, errorPrefix)
+  invariant(typeof run === 'function', 'vulnerability audit runner must be callable', errorPrefix)
+  if (policy === 'enforce') return run()
+  try {
+    return run()
+  } catch (error) {
+    const reason = String(error?.message || error).slice(0, 600)
+    report(`⚠️  GOV-RENDER-ONLY-REFERENCE:弱點稽核只報告、不擋(歷史參考樹,無憑證、用完即丟的渲染容器):${reason}`)
+    return Object.freeze({
+      schemaVersion: 1,
+      kind: 'render-only-reference-vulnerability-audit-receipt',
+      status: 'reported-not-enforced',
+      policy,
+      reason,
+    })
+  }
+}
+
 const CREDENTIAL_NAME = /(?:^|_)(?:TOKEN|SECRET|PASSWORD|PRIVATE_KEY|CLIENT_SECRET|API_KEY|ACCESS_KEY(?:_ID)?|AUTH_TOKEN)$/i
 const HOSTILE_NAME = /^(?:ALL_PROXY|BASH_ENV|CURL_HOME|DYLD_|ENV$|GIT_|GH_|HTTPS?_PROXY|LD_|NETRC$|NODE_AUTH_TOKEN$|NODE_EXTRA_CA_CERTS$|NODE_OPTIONS$|NODE_PATH$|NODE_TLS_REJECT_UNAUTHORIZED$|NO_PROXY$|NPM_CONFIG_|npm_config_|NPM_TOKEN$|OPENAI_API_KEY$|ANTHROPIC_API_KEY$|PERL5OPT$|PLAYWRIGHT_|PYTHONHOME$|PYTHONPATH$|RUBYOPT$|SSH_|SSL_CERT_DIR$|SSL_CERT_FILE$|all_proxy$|https?_proxy$|no_proxy$)/
 
@@ -275,9 +303,104 @@ function matchesVerifiedBraceExpansionAuditPreimage(finding) {
   ))
 }
 
+// 帶出實際形狀(2026-09-04 立、2026-09-23 擴到每一個分支):只印名字的話,判斷「該修版本、該擴 overlay、
+// 還是誤報」需要在本機重建一次同樣的樹才看得到 range 與路徑,而 CI 與本機的樹常常不一樣(fast-uri 就是這樣:
+// 同一個 commit,`Verify` 5 筆、authority candidate 6 筆,多的那筆只有 CI 看得到)。2026-09-22 再一次:npm 那筆
+// 的 range 字串因上游發版而變,閘只印「differs from the verified tar overlay closure」,本機系統 npm 的 audit
+// 對這幾筆回的 range 是空字串,整個新字串只有 closed 安裝才看得到。這些欄位是版本範圍與 node_modules 路徑,不含憑證。
+function describeFindingShape(finding) {
+  return [
+    `severity=${finding.severity}`,
+    `range=${String(finding.range).slice(0, 120)}`,
+    `nodes=${(Array.isArray(finding.nodes) ? finding.nodes : []).slice(0, 4).join('|') || '<none>'}`,
+    `effects=${(Array.isArray(finding.effects) ? finding.effects : []).slice(0, 6).join('|') || '<none>'}`,
+    `via=${(Array.isArray(finding.via) ? finding.via : []).map((v) => (typeof v === 'string' ? v : v?.url)).filter(Boolean).slice(0, 6).join('|') || '<none>'}`,
+  ].join(' ')
+}
+
+// 2026-09-23:npm 那筆 metavulnerability 的 range 是 registry 依 npm 的**版本清單**算出來的,上游每發一個版本,
+// 字串就變 —— 12.1.0 於 17:11Z 發布(帶修好的 tar),尾巴從 `>=12.0.0-pre.0.0` 變成 `12.0.0-pre.0.0 - 12.0.2`,
+// 17:16Z 起 main 與每一支 PR 的 CI 全紅,直到有人重釘。整條字串是「當下剛好成立的觀察量」(M37),要保證的
+// 性質只有三件:(1) 我們治理的 exact npm 仍被列為受影響(所以 overlay 必要);(2) 它的下一個 patch 不在範圍內
+//(修好的 npm 存在,升級路徑仍成立);(3) 只經 tar 受影響(via)。下面直接驗這三件,不再釘與我們無關的 12.x 尾巴。
+// 只接受 npm 產生 metavuln range 時會用到的子句形狀(`<=X` `<X` `>=X` `>X` `=X` `X` `A - B` `*`,子句間以 `||`
+// 相接,子句內以空白相接),其他形狀一律 fail closed —— 這不是通用 semver,是這一筆稽核用得到的最小子集。
+const GOVERNED_VERSION_PATTERN = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?$/
+const GOVERNED_COMPARATOR_PATTERN = /^(<=|>=|<|>|=)?(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)$/
+
+export function parseGovernedVersion(text) {
+  const match = GOVERNED_VERSION_PATTERN.exec(String(text).trim())
+  invariant(match, `unsupported version in npm audit range:${String(text).slice(0, 40)}`)
+  return {
+    core: [Number(match[1]), Number(match[2]), Number(match[3])],
+    prerelease: match[4] === undefined ? null : match[4].split('.'),
+  }
+}
+
+function comparePrereleaseIdentifiers(left, right) {
+  const length = Math.max(left.length, right.length)
+  for (let index = 0; index < length; index += 1) {
+    if (left[index] === undefined) return -1
+    if (right[index] === undefined) return 1
+    const leftNumeric = /^\d+$/.test(left[index])
+    const rightNumeric = /^\d+$/.test(right[index])
+    if (leftNumeric && rightNumeric) {
+      const delta = Number(left[index]) - Number(right[index])
+      if (delta !== 0) return delta < 0 ? -1 : 1
+    } else if (leftNumeric !== rightNumeric) {
+      return leftNumeric ? -1 : 1
+    } else if (left[index] !== right[index]) {
+      return left[index] < right[index] ? -1 : 1
+    }
+  }
+  return 0
+}
+
+export function compareGovernedVersions(leftText, rightText) {
+  const left = parseGovernedVersion(leftText)
+  const right = parseGovernedVersion(rightText)
+  for (let index = 0; index < 3; index += 1) {
+    if (left.core[index] !== right.core[index]) return left.core[index] < right.core[index] ? -1 : 1
+  }
+  if (left.prerelease === null && right.prerelease === null) return 0
+  if (left.prerelease === null) return 1
+  if (right.prerelease === null) return -1
+  return comparePrereleaseIdentifiers(left.prerelease, right.prerelease)
+}
+
+function comparatorCovers(comparator, version) {
+  const match = GOVERNED_COMPARATOR_PATTERN.exec(comparator)
+  invariant(match, `unsupported comparator in npm audit range:${comparator.slice(0, 40)}`)
+  const delta = compareGovernedVersions(version, match[2])
+  switch (match[1] ?? '=') {
+    case '<=': return delta <= 0
+    case '<': return delta < 0
+    case '>=': return delta >= 0
+    case '>': return delta > 0
+    default: return delta === 0
+  }
+}
+
+export function metavulnerabilityRangeCovers(range, version) {
+  invariant(typeof range === 'string' && range.trim().length > 0, 'npm audit range must be a non-empty string')
+  return range.split('||').some((clause) => {
+    const text = clause.trim()
+    if (text === '*') return true
+    const hyphen = /^(\S+)\s+-\s+(\S+)$/.exec(text)
+    const comparators = hyphen ? [`>=${hyphen[1]}`, `<=${hyphen[2]}`] : text.split(/\s+/)
+    return comparators.every((comparator) => comparatorCovers(comparator, version))
+  })
+}
+
+export function nextPatchVersion(text) {
+  const { core } = parseGovernedVersion(text)
+  return `${core[0]}.${core[1]}.${core[2] + 1}`
+}
+
 function assertRemediatedFinding(name, finding) {
   invariant(finding && typeof finding === 'object' && !Array.isArray(finding), `npm audit finding is malformed:${name}`)
   invariant(finding.name === name, `npm audit finding identity drifted:${name}`)
+  const shape = describeFindingShape(finding)
   if (name === 'brace-expansion') {
     invariant(
       finding.severity === 'high'
@@ -287,7 +410,7 @@ function assertRemediatedFinding(name, finding) {
         && finding.effects.length <= 1
         && finding.effects.every((effect) => effect === 'minimatch')
         && matchesVerifiedBraceExpansionAuditPreimage(finding),
-      'npm audit brace-expansion finding differs from the exact remediated bundled preimage',
+      `npm audit brace-expansion finding differs from the exact remediated bundled preimage(${shape})`,
     )
     return
   }
@@ -309,7 +432,7 @@ function assertRemediatedFinding(name, finding) {
           { source: 1130723, range: '>=10.1.1 <=10.2.1', url: 'https://github.com/advisories/GHSA-4xrf-jv44-h6hh', severity: 'moderate' },
           { source: 1130724, range: '>=10.1.1 <=10.2.0', url: 'https://github.com/advisories/GHSA-22jq-vg5j-6vgg', severity: 'moderate' },
         ]),
-      'npm audit ip-address finding differs from the acknowledged bundled preimage',
+      `npm audit ip-address finding differs from the acknowledged bundled preimage(${shape})`,
     )
     return
   }
@@ -327,7 +450,7 @@ function assertRemediatedFinding(name, finding) {
           { source: 1130727, range: '<6.28.0', url: 'https://github.com/advisories/GHSA-m8rv-5g2x-5cg5', severity: 'moderate' },
           { source: 1130732, range: '<6.28.0', url: 'https://github.com/advisories/GHSA-v3r7-h72x-cjcm', severity: 'moderate' },
         ]),
-      'npm audit undici finding differs from the acknowledged bundled preimage',
+      `npm audit undici finding differs from the acknowledged bundled preimage(${shape})`,
     )
     return
   }
@@ -349,35 +472,30 @@ function assertRemediatedFinding(name, finding) {
         && finding.via[0]?.url === 'https://github.com/advisories/GHSA-r292-9mhp-454m'
         && finding.via[0]?.severity === 'high'
         && finding.via[0]?.range === '<=7.5.20',
-      'npm audit tar finding differs from the exact remediated bundled preimage',
+      `npm audit tar finding differs from the exact remediated bundled preimage(${shape})`,
     )
     return
   }
   if (name === 'npm') {
-    // Follows the tar re-score; npm 11.19.1 ships fixed tar so the metavulnerability range now
-    // closes at 11.19.0 (our governed runtime). Moving to a fixed npm stays tracked in the
-    // cloud-compat baton alongside ip-address/undici.
+    // Follows the tar re-score; npm 11.19.1 ships fixed tar, so the governed 11.19.0 must still be
+    // listed and its next patch must not be (the fixed upgrade path exists). Moving to a fixed npm
+    // stays tracked in the cloud-compat baton alongside ip-address/undici. The rest of the range
+    // (10.x / 12.x clauses) describes versions we do not run and changes with every upstream
+    // release — see the 2026-09-23 note above metavulnerabilityRangeCovers.
+    const governed = GOVERNANCE_DEPENDENCY_EXACT_NPM_VERSION
     invariant(
       finding.severity === 'high'
         && finding.isDirect === true
         && exactArray(finding.via, ['tar'])
         && exactArray(finding.nodes, ['node_modules/npm'])
         && exactArray(finding.effects, [])
-        && finding.range === '<=10.9.8 || 11.0.0-pre.0 - 11.19.0 || >=12.0.0-pre.0.0',
-      'npm audit npm metavulnerability differs from the verified tar overlay closure',
+        && typeof finding.range === 'string'
+        && metavulnerabilityRangeCovers(finding.range, governed)
+        && !metavulnerabilityRangeCovers(finding.range, nextPatchVersion(governed)),
+      `npm audit npm metavulnerability differs from the verified tar overlay closure(${shape})`,
     )
     return
   }
-  // 帶出實際形狀(2026-09-04):只印名字的話,判斷「該修版本、該擴 overlay、還是誤報」需要在
-  // 本機重建一次同樣的樹才看得到 range 與路徑,而 CI 與本機的樹常常不一樣(fast-uri 就是這樣:
-  // 同一個 commit,`Verify` 5 筆、authority candidate 6 筆,多的那筆只有 CI 看得到)。
-  // 這些欄位是版本範圍與 node_modules 路徑,不含憑證。
-  const shape = [
-    `severity=${finding.severity}`,
-    `range=${String(finding.range).slice(0, 80)}`,
-    `nodes=${(Array.isArray(finding.nodes) ? finding.nodes : []).slice(0, 4).join('|') || '<none>'}`,
-    `via=${(Array.isArray(finding.via) ? finding.via : []).map((v) => (typeof v === 'string' ? v : v?.url)).filter(Boolean).slice(0, 4).join('|') || '<none>'}`,
-  ].join(' ')
   invariant(false, `npm audit contains an unremediated high/moderate finding:${name}(${shape})`)
 }
 
@@ -465,6 +583,20 @@ export function evaluateVerifiedHighVulnerabilityAudit({
   })
 }
 
+// 2026-09-24:`npm audit` 對 registry 的 advisory 端點是一次網路呼叫,共享 runner 上偶發 `read ECONNRESET` / 503
+//(main d93284c1 那一輪的 dpr2 job 在任何閘跑之前就死在這一步;PAT 沒有 actions:write,不能重跑,只能再開一個 PR 合併
+// 才有新的一輪)。只對「advisory 端點的暫時性網路錯誤」重試,上限 3 次、退避 2s/4s;真正的漏洞發現、格式錯誤、
+// spawn 錯誤一律不重試;用盡仍 fail closed,訊息帶 attempts。判定抽成純函式 `isTransientAdvisoryEndpointFailure`,
+// 測試兩面對照(該重試的一筆、不該重試的一筆)。
+export const GOVERNANCE_AUDIT_TRANSIENT_RETRY_LIMIT = 3
+export const GOVERNANCE_AUDIT_TRANSIENT_BACKOFF_MS = 2_000
+const TRANSIENT_ADVISORY_REASON = /ECONNRESET|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|EPIPE|socket hang up|network timeout|\b50[234]\b/i
+export function isTransientAdvisoryEndpointFailure(error) {
+  const text = String(error?.message || '')
+  return text.includes('npm audit advisory endpoint failed:') && TRANSIENT_ADVISORY_REASON.test(text)
+}
+const sleepSync = (ms) => { if (ms > 0) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms) }
+
 export function runVerifiedHighVulnerabilityAudit(command, args, {
   root,
   environment,
@@ -473,6 +605,10 @@ export function runVerifiedHighVulnerabilityAudit(command, args, {
   installedOverlayReceipt,
   errorPrefix = 'GOV-DEPENDENCY-BOOTSTRAP-001',
   timeoutMs = 15 * 60 * 1_000,
+  retryLimit = GOVERNANCE_AUDIT_TRANSIENT_RETRY_LIMIT,
+  backoffMs = GOVERNANCE_AUDIT_TRANSIENT_BACKOFF_MS,
+  sleep = sleepSync,
+  report = (line) => console.error(line),
 } = {}) {
   invariant(
     Array.isArray(args)
@@ -481,23 +617,36 @@ export function runVerifiedHighVulnerabilityAudit(command, args, {
     'npm high-vulnerability audit argv differs from the closed overlay-aware contract',
     errorPrefix,
   )
-  const result = runner(command, args, {
-    cwd: root,
-    env: environment,
-    encoding: 'utf8',
-    shell: false,
-    stdio: ['ignore', 'pipe', 'pipe'],
-    timeout: timeoutMs,
-    windowsHide: true,
-  })
-  if (result?.error) throw result.error
-  invariant(Number.isInteger(result?.status), `${command} did not return an exit status`, errorPrefix)
-  return evaluateVerifiedHighVulnerabilityAudit({
-    stdout: result.stdout,
-    exitStatus: result.status,
-    npmRuntime,
-    installedOverlayReceipt,
-  })
+  invariant(Number.isInteger(retryLimit) && retryLimit >= 1, 'npm audit retry limit must be a positive integer', errorPrefix)
+  for (let attempt = 1; ; attempt += 1) {
+    const result = runner(command, args, {
+      cwd: root,
+      env: environment,
+      encoding: 'utf8',
+      shell: false,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      timeout: timeoutMs,
+      windowsHide: true,
+    })
+    if (result?.error) throw result.error
+    invariant(Number.isInteger(result?.status), `${command} did not return an exit status`, errorPrefix)
+    try {
+      return evaluateVerifiedHighVulnerabilityAudit({
+        stdout: result.stdout,
+        exitStatus: result.status,
+        npmRuntime,
+        installedOverlayReceipt,
+      })
+    } catch (error) {
+      if (!isTransientAdvisoryEndpointFailure(error)) throw error
+      if (attempt >= retryLimit) {
+        throw new Error(`${String(error.message)}(after ${attempt} attempts)`)
+      }
+      const wait = backoffMs * attempt
+      report(`⚠️  ${errorPrefix}:npm audit advisory endpoint transient failure(attempt ${attempt}/${retryLimit}),retrying in ${wait}ms:${String(error.message).slice(0, 240)}`)
+      sleep(wait)
+    }
+  }
 }
 
 export async function runVerifiedGovernanceDependencyBootstrap({
@@ -512,7 +661,9 @@ export async function runVerifiedGovernanceDependencyBootstrap({
   validateRoleRepository = () => {},
   afterStage = () => {},
   errorPrefix = 'GOV-DEPENDENCY-BOOTSTRAP-001',
+  vulnerabilityPolicy = 'enforce',
 } = {}) {
+  invariant(GOVERNANCE_VULNERABILITY_POLICIES.includes(vulnerabilityPolicy), `unsupported vulnerability policy:${String(vulnerabilityPolicy)}`, errorPrefix)
   const root = realpathSync(resolve(rootPath))
   assertNoRootNpmShrinkwrap(root, { errorPrefix })
   const bootstrapRuntime = assertGovernanceBootstrapRuntime({
@@ -543,14 +694,14 @@ export async function runVerifiedGovernanceDependencyBootstrap({
     for (let index = 0; index < GOVERNANCE_DEPENDENCY_NPM_STEPS.length; index += 1) {
       const args = GOVERNANCE_DEPENDENCY_NPM_STEPS[index]
       if (index === 2) {
-        auditReceipt = runVerifiedHighVulnerabilityAudit(process.execPath, [npmRuntime.cli, ...args], {
+        auditReceipt = runVulnerabilityAuditUnderPolicy(vulnerabilityPolicy, () => runVerifiedHighVulnerabilityAudit(process.execPath, [npmRuntime.cli, ...args], {
           root,
           environment: isolated.env,
           runner,
           npmRuntime,
           installedOverlayReceipt,
           errorPrefix,
-        })
+        }), { errorPrefix })
       } else {
         runClosedBootstrapStep(process.execPath, [npmRuntime.cli, ...args], { root, environment: isolated.env, runner, errorPrefix })
         if (index === 0) installedOverlayReceipt = npmRuntime.applyInstalledSecurityOverlay(root)
